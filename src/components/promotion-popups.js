@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { X } from './icons';
 
 function activeNow(p, now) {
@@ -11,8 +12,10 @@ function activeNow(p, now) {
 }
 
 export function PromotionPopups({ popups = [] }) {
+  const pathname = usePathname();
   const [current, setCurrent] = useState(null);
   useEffect(() => {
+    if (pathname?.startsWith('/admin')) { setCurrent(null); return; }
     const now = Date.now();
     const eligible = popups.filter((p) => activeNow(p, now)).sort((a,b) => Number(b.priority || 0) - Number(a.priority || 0));
     const candidate = eligible.find((p) => {
@@ -23,7 +26,7 @@ export function PromotionPopups({ popups = [] }) {
     const delay = Math.max(0, Math.min(120, Number(candidate.delay_seconds) || 0)) * 1000;
     const timer = setTimeout(() => setCurrent(candidate), delay);
     return () => clearTimeout(timer);
-  }, [popups]);
+  }, [popups, pathname]);
 
   function dismiss() {
     if (current) {
@@ -32,7 +35,7 @@ export function PromotionPopups({ popups = [] }) {
     }
     setCurrent(null);
   }
-  if (!current) return null;
+  if (pathname?.startsWith('/admin') || !current) return null;
   const href = typeof current.cta_url === 'string' && current.cta_url.startsWith('/') && !current.cta_url.startsWith('//') ? current.cta_url : '/shop';
   return <div className="promo-popup-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && dismiss()}>
     <section className="promo-popup" role="dialog" aria-modal="true" aria-labelledby="promo-popup-title">

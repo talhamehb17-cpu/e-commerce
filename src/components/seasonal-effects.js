@@ -1,10 +1,12 @@
 'use client';
 import { useMemo } from 'react';
+import { usePathname } from 'next/navigation';
 
 const AUTO = ['winter','winter','spring','spring','spring','summer','summer','summer','autumn','autumn','autumn','winter'];
 export function SeasonalEffects({ config = {} }) {
+  const pathname = usePathname();
   const season = useMemo(() => config.automatic ? AUTO[new Date().getMonth()] : config.season, [config.automatic, config.season]);
-  if (!config.enabled || !season || season === 'none') return null;
+  if (pathname?.startsWith('/admin') || !config.enabled || !season || season === 'none') return null;
   const count = Math.max(8, Math.min(36, Math.round(Number(config.intensity ?? 35) / 3)));
   const speed = Math.max(.6, Math.min(5, Number(config.speed ?? 2)));
   const kinds = { spring: ['✿','❀','✽'], summer: ['·','✦','•'], autumn: ['🍂','✧','❧'], winter: ['❄','✧','·'], rain: ['│','╱','·'], confetti: ['✦','●','◆'], festive: ['✦','❄','✧'] };
