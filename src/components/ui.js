@@ -19,6 +19,7 @@ export function ProductCard({ product, money, priority = false, saved = false, o
   const hasCompare = product.compareAtPrice && product.compareAtPrice > product.price;
   return (
     <article className="pcard" data-product-id={product.id}>
+      <div className="pcard-media-wrap">
       <Link href={`/products/${product.slug}`} className="pcard-media" aria-label={product.name} data-has-gallery={Boolean(product.image2 && product.image2 !== product.image)}>
         <span className="pcard-badges">
           {product.badge === 'new' && <span className="tag new">New</span>}
@@ -46,6 +47,7 @@ export function ProductCard({ product, money, priority = false, saved = false, o
         <button type="button" className="btn" aria-label={product.stock === 0 ? `${product.name} is sold out` : `${product.variantCount > 0 ? 'Choose options for' : 'Add'} ${product.name} to bag`} disabled={product.stock === 0} onClick={() => onAdd?.(product)}>
           {product.stock === 0 ? 'Sold out' : product.variantCount > 0 ? 'Choose options' : 'Add to bag'}
         </button>
+      </div>
       </div>
 
       <div className="pcard-body">
