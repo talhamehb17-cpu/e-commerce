@@ -18,8 +18,8 @@ export function Stars({ rating = 0, count, size = 12 }) {
 export function ProductCard({ product, money, priority = false, saved = false, onAdd, onSave, onQuick, sizes = '(max-width:720px) 50vw, (max-width:1180px) 33vw, 25vw' }) {
   const hasCompare = product.compareAtPrice && product.compareAtPrice > product.price;
   return (
-    <article className="pcard">
-      <Link href={`/products/${product.slug}`} className="pcard-media" aria-label={product.name}>
+    <article className="pcard" data-product-id={product.id}>
+      <Link href={`/products/${product.slug}`} className="pcard-media" aria-label={product.name} data-has-gallery={Boolean(product.image2 && product.image2 !== product.image)}>
         <span className="pcard-badges">
           {product.badge === 'new' && <span className="tag new">New</span>}
           {product.badge === 'bestseller' && <span className="tag">Bestseller</span>}
@@ -28,7 +28,7 @@ export function ProductCard({ product, money, priority = false, saved = false, o
           {product.stock === 0 && <span className="tag">Sold out</span>}
         </span>
         <Image className="img-a" src={product.image} alt={product.name} fill sizes={sizes} priority={priority} quality={78} />
-        {product.image2 && <Image className="img-b" src={product.image2} alt="" fill sizes={sizes} quality={70} aria-hidden="true" />}
+        {product.image2 && product.image2 !== product.image && <Image className="img-b" src={product.image2} alt={`${product.name}, alternate view`} fill sizes={sizes} quality={78} aria-hidden="true" />}
       </Link>
 
       <div className="pcard-actions">

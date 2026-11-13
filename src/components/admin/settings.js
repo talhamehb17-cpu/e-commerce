@@ -9,6 +9,8 @@ const TABS = [
   ['payments', 'Payments', CreditCard],
   ['email', 'Email', Mail],
   ['notifications', 'Notifications', Bell],
+  ['seasonal', 'Seasonal effects', Bell],
+  ['promotions', 'Promotions & popups', Bell],
   ['system', 'System', Database],
 ];
 
@@ -29,6 +31,7 @@ export function AdminSettings() {
   if (!settings) return <div className="panel">Loading settings…</div>;
 
   const set = (group, key, value) => setSettings((s) => ({ ...s, [group]: { ...s[group], [key]: value } }));
+  const setPopup = (id, patch) => setSettings((s) => ({ ...s, promotions: { ...s.promotions, popups: (s.promotions?.popups || []).map((p) => p.id === id ? { ...p, ...patch } : p) } }));
 
   async function save(group) {
     setSaving(true);
@@ -69,6 +72,7 @@ export function AdminSettings() {
             <div className="field"><label>Tagline</label><input className="input" value={s.store.tagline} onChange={(e) => set('store', 'tagline', e.target.value)} /></div>
           </div>
           <div className="field"><label>Announcement bar</label><input className="input" value={s.store.announcement} onChange={(e) => set('store', 'announcement', e.target.value)} /></div>
+          <div className="form-row"><div className="field"><label>Show announcement from (optional)</label><input className="input" type="date" value={s.store.announcement_starts_at || ''} onChange={(e)=>set('store','announcement_starts_at',e.target.value)} /></div><div className="field"><label>Show announcement through (optional)</label><input className="input" type="date" value={s.store.announcement_ends_at || ''} onChange={(e)=>set('store','announcement_ends_at',e.target.value)} /></div></div>
           <div className="form-row">
             <div className="field"><label>Support email</label><input className="input" type="email" value={s.store.email} onChange={(e) => set('store', 'email', e.target.value)} /></div>
             <div className="field"><label>Phone</label><input className="input" value={s.store.phone} onChange={(e) => set('store', 'phone', e.target.value)} /></div>
@@ -101,7 +105,9 @@ export function AdminSettings() {
             <div className="field"><label>Delivery estimate</label><input className="input" value={s.shipping.delivery_days} onChange={(e) => set('shipping', 'delivery_days', e.target.value)} /></div>
             <div className="field"><label>Return window (days)</label><input className="input" type="number" value={s.shipping.return_window_days} onChange={(e) => set('shipping', 'return_window_days', Number(e.target.value))} /></div>
           </div>
-          <button className="btn" onClick={() => save('shipping')}><Save size={13} /> Save shipping</button>
+          <div className="panel-head" style={{ marginTop: 18 }}><h3>Delivery confirmation reminders</h3></div>
+          <div className="field" style={{ maxWidth: 240 }}><label>Reminder interval (minutes)</label><input className="input" type="number" min="1" max="1440" value={s.delivery?.reminder_minutes ?? 5} onChange={(e) => set('delivery', 'reminder_minutes', Math.max(1, Number(e.target.value)))} /></div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button className="btn" onClick={() => save('shipping')}><Save size={13} /> Save shipping</button><button className="btn btn-outline" onClick={() => save('delivery')}><Save size={13} /> Save reminders</button></div>
         </div>
       )}
 
@@ -151,6 +157,39 @@ export function AdminSettings() {
           <div className="panel-head"><h3>Visitor analytics</h3></div>
           <label className="switch" style={{ marginBottom: 14 }}><input type="checkbox" checked={Boolean(s.analytics.track_visitors)} onChange={(e) => set('analytics', 'track_visitors', e.target.checked)} /> Track page views and unique visitors</label>
           <button className="btn" onClick={() => save('analytics')}><Save size={13} /> Save analytics</button>
+        </div>
+      )}
+
+      {tab === 'seasonal' && (
+        <div className="panel">
+          <div className="panel-head"><div><h3>Seasonal atmosphere</h3><p className="sub">Decorative storefront-only effects. They never capture clicks and are disabled for reduced-motion visitors.</p></div></div>
+          <label className="switch" style={{ marginBottom: 14 }}><input type="checkbox" checked={Boolean(s.seasonal?.enabled)} onChange={(e) => set('seasonal', 'enabled', e.target.checked)} /> Enable seasonal effects</label>
+          <label className="switch" style={{ marginBottom: 14, display: 'flex' }}><input type="checkbox" checked={Boolean(s.seasonal?.automatic)} onChange={(e) => set('seasonal', 'automatic', e.target.checked)} /> Choose season automatically by calendar</label>
+          <div className="form-row">
+            <div className="field"><label>Season / effect</label><select className="input" value={s.seasonal?.season || 'none'} disabled={s.seasonal?.automatic} onChange={(e) => set('seasonal', 'season', e.target.value)}>{['none','spring','summer','autumn','winter','rain','confetti','festive'].map((v) => <option key={v} value={v}>{v.replace(/^./, (x) => x.toUpperCase())}</option>)}</select></div>
+            <div className="field"><label>Intensity ({s.seasonal?.intensity ?? 35}%)</label><input className="input" type="range" min="10" max="90" value={s.seasonal?.intensity ?? 35} onChange={(e) => set('seasonal', 'intensity', Number(e.target.value))} /></div>
+          </div>
+          <div className="field" style={{ maxWidth: 300 }}><label>Animation speed ({s.seasonal?.speed ?? 2}×)</label><input className="input" type="range" min="0.6" max="5" step="0.2" value={s.seasonal?.speed ?? 2} onChange={(e) => set('seasonal', 'speed', Number(e.target.value))} /></div>
+          <div className="form-row"><div className="field"><label>Schedule starts (optional)</label><input className="input" type="date" value={s.seasonal?.starts_at || ''} onChange={(e)=>set('seasonal','starts_at',e.target.value)} /></div><div className="field"><label>Schedule ends (optional)</label><input className="input" type="date" value={s.seasonal?.ends_at || ''} onChange={(e)=>set('seasonal','ends_at',e.target.value)} /></div></div>
+          <div className="seasonal-demo" aria-hidden="true">{(s.seasonal?.season === 'winter' ? '❄ ✧ ❄' : s.seasonal?.season === 'autumn' ? '🍂 ❧ 🍂' : s.seasonal?.season === 'summer' ? '✦ ☼ ✦' : s.seasonal?.season === 'none' ? 'Preview disabled' : '✿ ❀ ✿')}</div>
+          <button className="btn" onClick={() => save('seasonal')}><Save size={13} /> Save seasonal effects</button>
+        </div>
+      )}
+
+      {tab === 'promotions' && (
+        <div className="panel">
+          <div className="panel-head"><div><h3>Priority-aware promotional popups</h3><p className="sub">Scheduled campaigns are stored in settings. If multiple are eligible, the highest priority is shown first.</p></div><button className="btn btn-sm" onClick={() => set('promotions', 'popups', [...(s.promotions?.popups || []), { id: `popup-${Date.now()}`, enabled: true, title: '', body: '', cta_label: 'Shop now', cta_url: '/shop', priority: 0, starts_at: '', ends_at: '', delay_seconds: 4, frequency_days: 7 }])}>Add popup</button></div>
+          {(s.promotions?.popups || []).map((p, index) => <article key={p.id} className="popup-admin-card">
+            <div className="panel-head"><strong>Campaign {index + 1}</strong><button className="btn btn-outline btn-sm" onClick={() => set('promotions','popups',(s.promotions?.popups || []).filter((x)=>x.id!==p.id))}>Remove</button></div>
+            <label className="switch"><input type="checkbox" checked={p.enabled !== false} onChange={(e)=>setPopup(p.id,{enabled:e.target.checked})} /> Enabled</label>
+            <div className="form-row"><div className="field"><label>Popup title</label><input className="input" maxLength={120} value={p.title || ''} onChange={(e)=>setPopup(p.id,{title:e.target.value})} /></div><div className="field"><label>Priority (higher wins)</label><input className="input" type="number" min="0" max="1000" value={p.priority ?? 0} onChange={(e)=>setPopup(p.id,{priority:Number(e.target.value)})} /></div></div>
+            <div className="field"><label>Message</label><textarea className="input" rows={3} maxLength={500} value={p.body || ''} onChange={(e)=>setPopup(p.id,{body:e.target.value})} /></div>
+            <div className="form-row"><div className="field"><label>Button label</label><input className="input" maxLength={40} value={p.cta_label || ''} onChange={(e)=>setPopup(p.id,{cta_label:e.target.value})} /></div><div className="field"><label>Button link (internal path)</label><input className="input" value={p.cta_url || '/shop'} onChange={(e)=>setPopup(p.id,{cta_url:e.target.value})} /></div></div>
+            <div className="form-row"><div className="field"><label>Starts on</label><input className="input" type="date" value={p.starts_at || ''} onChange={(e)=>setPopup(p.id,{starts_at:e.target.value})} /></div><div className="field"><label>Ends on</label><input className="input" type="date" value={p.ends_at || ''} onChange={(e)=>setPopup(p.id,{ends_at:e.target.value})} /></div></div>
+            <div className="form-row"><div className="field"><label>Initial delay (seconds)</label><input className="input" type="number" min="0" max="120" value={p.delay_seconds ?? 4} onChange={(e)=>setPopup(p.id,{delay_seconds:Math.max(0,Math.min(120,Number(e.target.value)))})} /></div><div className="field"><label>Show again after (days)</label><input className="input" type="number" min="1" max="365" value={p.frequency_days ?? 7} onChange={(e)=>setPopup(p.id,{frequency_days:Math.max(1,Math.min(365,Number(e.target.value)))})} /></div></div>
+          </article>)}
+          {!(s.promotions?.popups || []).length && <p className="sub">No popup campaigns configured.</p>}
+          <button className="btn" onClick={() => save('promotions')} disabled={saving}><Save size={13} /> {saving ? 'Saving…' : 'Save popup campaigns'}</button>
         </div>
       )}
 

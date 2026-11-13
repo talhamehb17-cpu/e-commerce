@@ -176,10 +176,11 @@ export async function getProductBySlug(slug) {
   };
 }
 
-export async function getProductReviews(productId, limit = 50, sort = 'recent', rating = 0) {
+export async function getProductReviews(productId, limit = 50, sort = 'recent', rating = 0, verifiedOnly = false) {
   const ratingFilter = rating ? sql`and r.rating = ${rating}` : sql``;
   const order = sort === 'highest' ? sql`r.rating desc, r.created_at desc`
     : sort === 'lowest' ? sql`r.rating asc, r.created_at desc`
+    : sort === 'oldest' ? sql`r.created_at asc`
     : sort === 'helpful' ? sql`r.helpful_count desc, r.created_at desc`
     : sql`r.created_at desc`;
   const rows = await sql`
@@ -187,6 +188,7 @@ export async function getProductReviews(productId, limit = 50, sort = 'recent', 
            cu.name as customer_name, cu.avatar_url
     from reviews r join customers cu on cu.id = r.customer_id
     where r.product_id = ${productId} and r.is_approved ${ratingFilter}
+      and (${verifiedOnly} = false or r.is_verified = true)
     order by ${order} limit ${limit}
   `;
   const dist = await sql`
@@ -263,7 +265,8 @@ export async function getCollectionProducts(collectionId, limit = 24) {
 export async function getFeaturedReviews(limit = 3) {
   return sql`
     select r.id, r.rating, r.title, r.body, r.created_at, r.is_verified,
-           cu.name as customer_name, cu.avatar_url, p.name as product_name, p.slug as product_slug
+           cu.name as customer_name, cu.avatar_url, p.name as product_name, p.slug as product_slug,
+           (select url from product_images pi where pi.product_id=p.id order by position limit 1) as product_image
     from reviews r join customers cu on cu.id = r.customer_id join products p on p.id = r.product_id
     where r.is_approved and r.is_featured
     order by r.rating desc, r.created_at desc limit ${limit}

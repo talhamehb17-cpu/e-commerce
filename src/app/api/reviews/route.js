@@ -9,7 +9,7 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const productId = searchParams.get('productId');
   if (!productId) return fail('Missing productId', 400);
-  const data = await getProductReviews(productId, 50, searchParams.get('sort') || 'recent', Number(searchParams.get('rating') || 0));
+  const data = await getProductReviews(productId, 50, searchParams.get('sort') || 'recent', Number(searchParams.get('rating') || 0), searchParams.get('verified') === '1');
   return json(data);
 }
 
@@ -22,7 +22,7 @@ export async function POST(request) {
   // Verified purchase is calculated from order history — never fabricated.
   const purchased = await sql`
     select 1 from orders o join order_items oi on oi.order_id = o.id
-    where o.customer_id = ${customer.id} and oi.product_id = ${data.productId} and o.status not in ('cancelled')
+    where o.customer_id = ${customer.id} and oi.product_id = ${data.productId} and o.status = 'delivered'
     limit 1
   `;
 

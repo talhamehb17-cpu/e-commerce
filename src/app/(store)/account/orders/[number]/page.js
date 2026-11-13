@@ -7,6 +7,7 @@ import { getCurrentAdmin } from '@/lib/auth';
 import { fulfillOrder, timelineFor } from '@/lib/orders';
 import { StatusPill } from '@/components/ui';
 import { Truck, MapPin, CreditCard } from '@/components/icons';
+import { DeliveryConfirmation } from '@/components/delivery-confirmation';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,8 @@ export default async function OrderDetail({ params }) {
         </div>
         <StatusPill status={order.status} />
       </div>
+
+      {order.status === 'out_for_delivery' && <DeliveryConfirmation orderNumber={order.order_number} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 14, marginBottom: 14 }}>
         <div className="card">

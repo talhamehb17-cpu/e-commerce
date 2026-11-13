@@ -12,6 +12,8 @@ const DEFAULTS = {
     phone: '+92 300 000 0000',
     address: 'Studio 4, Gulberg III, Lahore, Pakistan',
     announcement: 'Free delivery over Rs 15,000 — 30-day easy returns',
+    announcement_starts_at: '',
+    announcement_ends_at: '',
     instagram: 'https://instagram.com',
     facebook: '',
     tiktok: '',
@@ -47,6 +49,9 @@ const DEFAULTS = {
   }),
   analytics: () => ({ track_visitors: true }),
   currency: () => ({ default: 'PKR', auto_update: true, last_sync: null }),
+  seasonal: () => ({ enabled: false, season: 'none', automatic: false, intensity: 35, speed: 2, starts_at: '', ends_at: '' }),
+  delivery: () => ({ reminder_minutes: 5 }),
+  promotions: () => ({ popups: [] }),
 };
 
 export async function getSetting(key) {

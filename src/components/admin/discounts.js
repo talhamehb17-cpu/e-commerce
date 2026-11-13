@@ -23,14 +23,14 @@ export function AdminDiscounts() {
       minSubtotal: Number(editing.min_subtotal || 0),
       maxDiscount: editing.max_discount ? Number(editing.max_discount) : null,
       usageLimit: editing.usage_limit ? Number(editing.usage_limit) : null,
-      startsAt: editing.starts_at || null,
-      endsAt: editing.ends_at || null,
+      startsAt: editing.starts_at ? `${String(editing.starts_at).slice(0, 10)}T00:00:00.000Z` : null,
+      endsAt: editing.ends_at ? `${String(editing.ends_at).slice(0, 10)}T23:59:59.999Z` : null,
       isActive: editing.is_active !== false,
     };
     const res = await fetch(editing.id ? `/api/admin/coupons/${editing.id}` : '/api/admin/coupons', {
       method: editing.id ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editing.id ? { isActive: payload.isActive, usageLimit: payload.usageLimit, endsAt: payload.endsAt, value: editing.type === 'percent' ? payload.value : undefined } : payload),
+      body: JSON.stringify(editing.id ? { isActive: payload.isActive, usageLimit: payload.usageLimit, startsAt: payload.startsAt, endsAt: payload.endsAt, value: editing.type === 'percent' ? payload.value : undefined } : payload),
     });
     const data = await res.json();
     if (!res.ok) { toast(data.error || 'Could not save', 'error'); return; }
@@ -107,7 +107,7 @@ export function AdminDiscounts() {
                 <div className="field"><label>Minimum spend (PKR)</label><input className="input" type="number" value={editing.min_subtotal ? editing.min_subtotal / 100 : ''} onChange={(e) => setEditing({ ...editing, min_subtotal: Number(e.target.value) * 100 })} /></div>
                 <div className="field"><label>Usage limit</label><input className="input" type="number" value={editing.usage_limit || ''} onChange={(e) => setEditing({ ...editing, usage_limit: e.target.value })} placeholder="unlimited" /></div>
               </div>
-              <div className="field"><label>Ends at</label><input className="input" type="date" value={editing.ends_at ? String(editing.ends_at).slice(0, 10) : ''} onChange={(e) => setEditing({ ...editing, ends_at: e.target.value || null })} /></div>
+              <div className="form-row"><div className="field"><label>Starts on (optional)</label><input className="input" type="date" value={editing.starts_at ? String(editing.starts_at).slice(0, 10) : ''} onChange={(e) => setEditing({ ...editing, starts_at: e.target.value || null })} /></div><div className="field"><label>Ends on (optional)</label><input className="input" type="date" value={editing.ends_at ? String(editing.ends_at).slice(0, 10) : ''} onChange={(e) => setEditing({ ...editing, ends_at: e.target.value || null })} /></div></div>
               <label className="switch" style={{ marginBottom: 14 }}><input type="checkbox" checked={editing.is_active !== false} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} /> Active</label>
               <button className="btn btn-block" onClick={save}>Save discount</button>
             </div>

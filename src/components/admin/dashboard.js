@@ -12,6 +12,22 @@ export function AdminDashboard({ initial, emailAlerts }) {
   const [range, setRange] = useState(30);
   const [data, setData] = useState(initial);
   const [loading, setLoading] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/admin/notifications', { cache: 'no-store' }).then(async (res) => {
+      if (!res.ok) throw new Error(`Notifications request failed (${res.status})`);
+      const d = await res.json(); if (active) setNotifications(d.notifications || []);
+    }).catch((e) => console.error('Could not load admin notifications', e));
+    return () => { active = false; };
+  }, []);
+
+  async function dismissNotification(id) {
+    const res = await fetch('/api/admin/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    if (!res.ok) { console.error('Could not mark notification read', res.status); return; }
+    setNotifications((rows) => rows.map((row) => row.id === id ? { ...row, is_read: true } : row));
+  }
 
   const load = useCallback(async (r) => {
     setLoading(true);
@@ -66,6 +82,7 @@ export function AdminDashboard({ initial, emailAlerts }) {
         </div>
       )}
 
+      {notifications.some((n) => !n.is_read && n.type === 'delivery_not_received') && <section className="delivery-admin-alert" aria-live="polite"><div><div className="eyebrow">Customer care · delivery alert</div><h3>Delivery issue reported</h3><p>Review the customer's order details and contact them to investigate.</p></div><div className="delivery-admin-alert-list">{notifications.filter((n) => !n.is_read && n.type === 'delivery_not_received').map((n) => <article key={n.id}><div><strong>{n.details?.orderNumber}</strong> · {n.details?.customerName}</div><small>{n.body}<br/>Contact: {n.details?.email} · {n.details?.phone || 'No phone'}<br/>Items: {(n.details?.products || []).map((p) => `${p.name} × ${p.qty}`).join(', ')}<br/>Address: {[n.details?.address?.line1,n.details?.address?.line2,n.details?.address?.city,n.details?.address?.state,n.details?.address?.country].filter(Boolean).join(', ')}<br/>Status: {n.details?.status} · Response: {n.details?.responseAt ? new Date(n.details.responseAt).toLocaleString() : ''}</small><button className="btn btn-outline btn-sm" onClick={() => dismissNotification(n.id)}>Mark reviewed</button></article>)}</div></section>}
       <div className="admin-grid kpi-grid" style={{ marginBottom: 14 }}>
         <Kpi label="Revenue" value={money(t.revenue)} delta={`${range}d window`} icon={TrendingUp} note={`${money(t.revenueAll)} all time`} />
         <Kpi label="Orders" value={compact(t.orders)} delta={`${t.ordersRange} in ${range}d`} icon={Package} href="/admin/orders" />

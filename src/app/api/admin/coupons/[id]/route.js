@@ -11,6 +11,7 @@ export async function PATCH(request, { params }) {
   if (body.isActive !== undefined) patch.is_active = Boolean(body.isActive);
   if (body.value !== undefined) patch.value = Math.round(Number(body.value));
   if (body.usageLimit !== undefined) patch.usage_limit = body.usageLimit ? Number(body.usageLimit) : null;
+  if (body.startsAt !== undefined) patch.starts_at = body.startsAt || null;
   if (body.endsAt !== undefined) patch.ends_at = body.endsAt || null;
   if (!Object.keys(patch).length) return fail('Nothing to update', 400);
   await sql`update coupons set ${sql(patch)} where id = ${id}`;

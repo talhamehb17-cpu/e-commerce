@@ -1,23 +1,21 @@
 'use client';
 import { createContext, useContext, useCallback, useMemo, useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { getTheme } from '@/lib/themes';
+import { fontStack } from '@/lib/typography';
 
 const StoreCtx = createContext(null);
 export const useStore = () => useContext(StoreCtx);
 
-const PALETTES = {
-  moonstone: { bg:'#f7f2ea',surface:'#fffdf8',surface2:'#efe7db',ink:'#16130f',muted:'#6d6459',line:'#dfd4c4',accent:'#b08d4f',accentSoft:'#e8dcc6',accentInk:'#fffdf8',glow:'rgba(176,141,79,.18)' },
-  obsidian: { bg:'#0d0f12',surface:'#15181d',surface2:'#1d2127',ink:'#f6f1e7',muted:'#a49b8c',line:'#2a2f36',accent:'#d9b978',accentSoft:'#2b2416',accentInk:'#12100b',glow:'rgba(217,185,120,.22)' },
-  rosewater: { bg:'#fbf4f2',surface:'#fffaf8',surface2:'#f4e6e2',ink:'#331f1b',muted:'#82615a',line:'#ead4ce',accent:'#c0786a',accentSoft:'#f3ded8',accentInk:'#fffaf8',glow:'rgba(192,120,106,.2)' },
-  emerald: { bg:'#0f1c18',surface:'#152621',surface2:'#1c312a',ink:'#eef2ea',muted:'#9fb1a3',line:'#27403a',accent:'#c2a86b',accentSoft:'#24352a',accentInk:'#0f1c18',glow:'rgba(194,168,107,.2)' },
-  porcelain: { bg:'#f6f7f9',surface:'#ffffff',surface2:'#eceff3',ink:'#12151a',muted:'#5e6a78',line:'#dbe1e8',accent:'#40536b',accentSoft:'#e2e8ef',accentInk:'#ffffff',glow:'rgba(64,83,107,.16)' },
-  saffron: { bg:'#fdf6ec',surface:'#fffcf6',surface2:'#f6e9d6',ink:'#2b1c12',muted:'#7b6450',line:'#e9d7bf',accent:'#b45f2c',accentSoft:'#f2dfc8',accentInk:'#fffcf6',glow:'rgba(180,95,44,.18)' },
-};
-export function applyPalette(slug) {
-  const p = PALETTES[slug] || PALETTES.moonstone;
+export function applyPalette(slug, fonts) {
   const root = document.documentElement;
-  Object.entries(p).forEach(([k, v]) => root.style.setProperty(`--${k}`, v));
-  root.dataset.mode = ['obsidian', 'emerald'].includes(slug) ? 'dark' : 'light';
+  const theme = getTheme(slug);
+  theme.colors && Object.entries(theme.colors).forEach(([key, value]) => root.style.setProperty(`--${key.replace(/[A-Z0-9]/g, (m) => '-' + m.toLowerCase())}`, value));
+  root.style.setProperty('--serif', fontStack(fonts?.heading || theme.font || 'Cormorant Garamond'));
+  root.style.setProperty('--sans', fontStack(fonts?.body || 'Inter'));
+  root.dataset.theme = theme.slug;
+  root.dataset.mode = theme.mode;
+  root.dataset.style = theme.style || 'editorial';
 }
 
 export function StoreProvider({ initial, children }) {
@@ -63,19 +61,43 @@ export function StoreProvider({ initial, children }) {
 
   const setTheme = useCallback(
     async (slug) => {
-      if (slug) { document.documentElement.dataset.theme = slug; applyPalette(slug); }
-      setState((s) => ({ ...s, theme: { ...s.theme, slug: slug || s.theme.slug, source: slug ? 'customer' : 'store' } }));
+      const targetSlug = slug || state.theme.defaultSlug || 'moonstone';
+      const preset = getTheme(targetSlug);
+      const nextFonts = state.theme.fontPersonal
+        ? state.theme.fonts
+        : (slug ? { heading: preset.font || 'Cormorant Garamond', body: 'Inter' } : state.theme.defaultFonts || { heading: preset.font || 'Cormorant Garamond', body: 'Inter' });
+      applyPalette(targetSlug, nextFonts);
+      setState((s) => ({ ...s, theme: { ...s.theme, slug: targetSlug, fonts: nextFonts, source: slug ? 'customer' : 'store' } }));
       try {
         localStorage.setItem('nova_theme', slug || '');
         await fetch('/api/account/preferences', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ theme_palette: slug || null }),
         });
-      } catch { /* guest: local only */ }
+      } catch (e) { console.error('Could not save theme preference', e); }
       router.refresh();
     },
-    [router]
+    [router, state.theme]
   );
+
+  const setFonts = useCallback(async (fonts, enabled = true) => {
+    const next = { heading: fonts.heading, body: fonts.body };
+    applyPalette(state.theme.slug, next);
+    setState((s) => ({ ...s, theme: { ...s.theme, fonts: next, fontPersonal: enabled } }));
+    try {
+      localStorage.setItem('nova_fonts', JSON.stringify({ ...next, enabled }));
+      await fetch('/api/account/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ font_preference: { ...next, enabled } }) });
+    } catch (e) { console.error('Could not save typography preference', e); }
+    router.refresh();
+  }, [router, state.theme]);
+
+  useEffect(() => {
+    const nextTheme = initial?.theme;
+    if (!nextTheme || state.theme.source === 'customer') return;
+    applyPalette(nextTheme.slug, nextTheme.fonts);
+    setState((s) => ({ ...s, theme: { ...s.theme, ...nextTheme } }));
+  }, [initial?.theme?.slug, initial?.theme?.fonts?.heading, initial?.theme?.fonts?.body]); // eslint-disable-line
 
   useEffect(() => {
     if (state.customer) return;
@@ -86,8 +108,8 @@ export function StoreProvider({ initial, children }) {
   }, [state.customer, state.currencies]); // eslint-disable-line
 
   const value = useMemo(
-    () => ({ ...state, patch, refresh, setCartCount, setWishlistCount, money, setCurrency, setTheme, activeCurrency }),
-    [state, patch, refresh, setCartCount, setWishlistCount, money, setCurrency, setTheme, activeCurrency]
+    () => ({ ...state, patch, refresh, setCartCount, setWishlistCount, money, setCurrency, setTheme, setFonts, activeCurrency }),
+    [state, patch, refresh, setCartCount, setWishlistCount, money, setCurrency, setTheme, setFonts, activeCurrency]
   );
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;

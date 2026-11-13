@@ -12,13 +12,16 @@ export function ReviewSection({ product, customer, myReview, verifiedPurchase })
   const [reviews, setReviews] = useState(product.reviews);
   const [sort, setSort] = useState('recent');
   const [filter, setFilter] = useState(0);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [writing, setWriting] = useState(false);
   const [lightbox, setLightbox] = useState(null);
 
-  async function reload(nextSort = sort, nextFilter = filter) {
-    const res = await fetch(`/api/reviews?productId=${product.id}&sort=${nextSort}&rating=${nextFilter}`);
-    const data = await res.json();
-    setReviews(data);
+  async function reload(nextSort = sort, nextFilter = filter, verified = verifiedOnly) {
+    try {
+      const res = await fetch(`/api/reviews?productId=${product.id}&sort=${nextSort}&rating=${nextFilter}&verified=${verified ? 1 : 0}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Review refresh failed (${res.status})`);
+      setReviews(await res.json());
+    } catch (e) { console.error(e); toast('Could not refresh reviews', 'error'); }
   }
 
   const avg = reviews.average;
@@ -63,6 +66,7 @@ export function ReviewSection({ product, customer, myReview, verifiedPurchase })
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
         <select className="input" style={{ width: 'auto', padding: '8px 12px', fontSize: 12.5 }} value={sort} onChange={(e) => { setSort(e.target.value); reload(e.target.value, filter); }}>
           <option value="recent">Most recent</option>
+          <option value="oldest">Oldest first</option>
           <option value="highest">Highest rated</option>
           <option value="lowest">Lowest rated</option>
           <option value="helpful">Most helpful</option>
@@ -72,6 +76,7 @@ export function ReviewSection({ product, customer, myReview, verifiedPurchase })
             {r === 0 ? 'All stars' : `${r} star`}
           </button>
         ))}
+        <button className="chip" data-on={verifiedOnly ? 'true' : 'false'} onClick={() => { const next = !verifiedOnly; setVerifiedOnly(next); reload(sort, filter, next); }}>Verified purchases</button>
       </div>
 
       {reviews.items.length === 0 && (
@@ -81,36 +86,9 @@ export function ReviewSection({ product, customer, myReview, verifiedPurchase })
       )}
 
       {reviews.items.map((r) => (
-        <article className="review-item" key={r.id}>
-          <div className="review-item-head">
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span className="avatar">{(r.customer_name || 'N')[0]}</span>
-              <div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <strong style={{ fontSize: 13.5 }}>{r.customer_name}</strong>
-                  {r.is_verified && <span className="verified"><BadgeCheck size={11} /> Verified purchase</span>}
-                </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
-                  <Stars rating={r.rating} />
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <HelpfulButton review={r} onDone={reload} />
-          </div>
-          {r.title && <h4>{r.title}</h4>}
-          <p>{r.body}</p>
-          {r.images?.length > 0 && (
-            <div className="review-images">
-              {r.images.map((src) => (
-                <Image key={src} src={src} alt="Customer photo" width={84} height={84} onClick={() => setLightbox(src)} style={{ cursor: 'zoom-in' }} />
-              ))}
-            </div>
-          )}
-        </article>
+        <ReviewCard key={r.id} review={r} product={product} onDone={() => reload()} onLightbox={setLightbox} />
       ))}
+
 
       {writing && (
         <ReviewForm
@@ -129,6 +107,25 @@ export function ReviewSection({ product, customer, myReview, verifiedPurchase })
       )}
     </section>
   );
+}
+
+function ReviewCard({ review: r, product, onDone, onLightbox }) {
+  const [expanded, setExpanded] = useState(false);
+  const long = (r.body || '').length > 260;
+  return <article className="review-item review-premium-card">
+    <div className="review-item-head">
+      <div className="review-author">
+        {r.avatar_url ? <Image className="review-avatar-photo" src={r.avatar_url} alt="" width={48} height={48} /> : <span className="avatar review-avatar-photo">{(r.customer_name || 'N')[0].toUpperCase()}</span>}
+        <div><div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}><strong style={{fontSize:13.5}}>{r.customer_name}</strong>{r.is_verified&&<span className="verified"><BadgeCheck size={11}/> Verified purchase</span>}</div>
+          <div style={{display:'flex',gap:8,alignItems:'center',marginTop:3}}><Stars rating={r.rating}/><span className="muted" style={{fontSize:11}}>{new Date(r.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span></div>
+          <Link className="review-product-link" href={`/products/${product.slug}`}><Image src={product.image} alt="" width={38} height={46}/><span><small>Reviewed product</small><strong>{product.name}</strong></span></Link>
+        </div>
+      </div><HelpfulButton review={r} onDone={onDone}/>
+    </div>
+    {r.title&&<h4>{r.title}</h4>}<p className={long&&!expanded?'review-copy-clamp':''}>{r.body}</p>
+    {long&&<button className="review-read-more" onClick={()=>setExpanded((v)=>!v)}>{expanded?'Show less':'Read full review'}</button>}
+    {r.images?.length>0&&<div className="review-images">{r.images.map((src)=><Image key={src} src={src} alt={`Customer photo of ${product.name}`} width={84} height={84} onClick={()=>onLightbox(src)} style={{cursor:'zoom-in'}} />)}</div>}
+  </article>;
 }
 
 function HelpfulButton({ review, onDone }) {

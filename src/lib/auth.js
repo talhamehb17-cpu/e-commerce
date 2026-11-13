@@ -61,7 +61,7 @@ export async function getCurrentCustomer() {
   const s = await readSession(CUSTOMER_COOKIE, 'customer');
   if (!s) return null;
   const rows = await sql`
-    select id, name, email, phone, avatar_url, email_verified, theme_palette, theme_mode,
+    select id, name, email, phone, avatar_url, email_verified, theme_palette, theme_mode, font_preference,
            currency, is_blocked, created_at
     from customers where id = ${s.subject_id} limit 1
   `;

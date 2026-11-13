@@ -35,6 +35,7 @@ create table if not exists customers (
   email_verified_at timestamptz,
   theme_palette text,                            -- null = inherit admin default
   theme_mode text,
+  font_preference jsonb not null default '{}'::jsonb,
   currency text,
   marketing_opt_in boolean not null default false,
   is_blocked boolean not null default false,
@@ -42,6 +43,7 @@ create table if not exists customers (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table customers add column if not exists font_preference jsonb not null default '{}'::jsonb;
 
 create table if not exists otp_codes (
   id uuid primary key default gen_random_uuid(),
@@ -251,6 +253,29 @@ create table if not exists order_events (
   email_sent boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+-- Customer response workflow for out-for-delivery orders. Reminder leasing is database-backed,
+-- so only one browser tab can claim a reminder at a time.
+create table if not exists delivery_confirmations (
+  order_id uuid primary key references orders(id) on delete cascade,
+  customer_id uuid references customers(id) on delete set null,
+  state text not null default 'pending',
+  response_at timestamptz,
+  next_reminder_at timestamptz not null default now(),
+  last_reminder_at timestamptz,
+  reminder_count int not null default 0,
+  created_at timestamptz not null default now()
+);
+create table if not exists admin_notifications (
+  id uuid primary key default gen_random_uuid(),
+  type text not null,
+  title text not null,
+  body text not null,
+  details jsonb not null default '{}'::jsonb,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_admin_notifications_unread on admin_notifications(is_read, created_at desc);
 
 -- ---------- reviews ----------
 create table if not exists reviews (

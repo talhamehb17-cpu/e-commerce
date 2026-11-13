@@ -287,10 +287,10 @@ function Reviews({ section, reviews }) {
                 <Stars rating={r.rating} />
                 <blockquote>“{r.body}”</blockquote>
                 <div className="review-who">
-                  <span className="avatar">{(r.customer_name || 'N')[0]}</span>
+                  {r.avatar_url ? <Image className="avatar" src={r.avatar_url} alt="" width={34} height={34} /> : <span className="avatar">{(r.customer_name || 'N')[0]}</span>}
                   <div>
                     <strong style={{ fontSize: 13 }}>{r.customer_name}</strong>
-                    <small>{r.product_name}</small>
+                    <Link href={`/products/${r.product_slug}`} className="home-review-product"><Image src={r.product_image || '/images/hero/hero-main.jpg'} alt="" width={34} height={42} /><small>{r.product_name}</small></Link>
                   </div>
                 </div>
               </article>

@@ -163,16 +163,9 @@ const PRODUCT_IMAGES = {
   'Canvas Market Tote': 'bags-tote-1',
 };
 
-/** Second image shown on card hover, per category. */
-const HOVER_IMAGES = {
-  electronics: '/images/hero/hero-side.jpg',
-  fashion: '/images/hero/hero-main.jpg',
-  shoes: '/images/hero/hero-side.jpg',
-  home: '/images/hero/hero-main.jpg',
-  beauty: '/images/hero/hero-side.jpg',
-  sports: '/images/hero/hero-main.jpg',
-  bags: '/images/hero/hero-side.jpg',
-};
+/** No secondary views are seeded until genuine alternate-angle photography exists.
+ * Reusing another SKU's primary image here creates a false product gallery. */
+const SECONDARY_IMAGES = {};
 
 async function main() {
   console.log('→ seeding general catalogue…');
@@ -228,14 +221,18 @@ async function main() {
     }
 
     const mediaRows = await sql`select url from product_images where product_id = ${id} order by position`;
+    const secondary = SECONDARY_IMAGES[name] ? `/images/products/${SECONDARY_IMAGES[name]}.jpg` : null;
+    const gallery = [primary, ...(secondary ? [secondary] : [])];
     const staleMedia = mediaRows.some(({ url }) => url?.startsWith('/images/')
       && !fsSync.existsSync(path.resolve('public', url.replace(/^\/+/, ''))));
-    if (mediaRows.length === 0 || staleMedia) {
-      await sql`delete from product_images where product_id = ${id}`;
-      const gallery = [primary, HOVER_IMAGES[cat] || '/images/hero/hero-main.jpg'];
-      const unique = [...new Set(gallery)];
-      for (let p = 0; p < unique.length; p++) {
-        await sql`insert into product_images (product_id, url, alt, position) values (${id}, ${unique[p]}, ${name}, ${p})`;
+    const legacyGeneric = mediaRows.some(({ url }) => url?.startsWith('/images/hero/hero-'));
+    const entirelySeededMedia = mediaRows.every(({ url }) => url?.startsWith('/images/'));
+    const wrongGallery = mediaRows.length !== gallery.length
+      || gallery.some((url, position) => mediaRows[position]?.url !== url);
+    if (mediaRows.length === 0 || staleMedia || legacyGeneric || (entirelySeededMedia && wrongGallery)) {
+      await sql`delete from product_images where product_id = ${id} and url like '/images/%'`;
+      for (let p = 0; p < gallery.length; p++) {
+        await sql`insert into product_images (product_id, url, alt, position) values (${id}, ${gallery[p]}, ${name}, ${p})`;
       }
     }
 

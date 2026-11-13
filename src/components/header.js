@@ -7,6 +7,7 @@ import { useStore } from './providers';
 import { CartDrawer, useCart } from './cart-drawer';
 import { SearchModal } from './search';
 import { ThemeSwitcher } from './theme-switcher';
+import { CurrencyFlag } from './currency-flag';
 import { Search, ShoppingBag, Heart, User, Menu, X } from './icons';
 
 const NAV = [
@@ -70,7 +71,7 @@ export function Header() {
             <button className="icon-btn" onClick={() => setSearchOpen(true)} aria-label="Search"><Search size={18} /></button>
             <div style={{ position: 'relative' }}>
               <button className="icon-btn" onClick={() => setCurrOpen((o) => !o)} aria-label="Change currency">
-                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.04em' }}>{currency}</span>
+                <span style={{ display: 'inline-flex', gap: 5, alignItems: 'center', fontSize: 11, fontWeight: 600, letterSpacing: '.04em' }}><CurrencyFlag code={currency} size={18} />{currency}</span>
               </button>
               {currOpen && (
                 <div style={{ position: 'absolute', right: 0, top: 46, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 6, minWidth: 170, boxShadow: 'var(--shadow)', zIndex: 70 }}>
@@ -79,9 +80,9 @@ export function Header() {
                     <button
                       key={c.code}
                       onClick={() => { setCurrency(c.code); setCurrOpen(false); }}
-                      style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: 12.5, background: c.code === currency ? 'var(--surface2)' : 'none', fontWeight: c.code === currency ? 600 : 400 }}
+                      style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: 12.5, background: c.code === currency ? 'var(--surface2)' : 'none', fontWeight: c.code === currency ? 600 : 400 }}
                     >
-                      <span>{c.code}</span><span className="muted">{c.symbol}</span>
+                      <CurrencyFlag code={c.code} size={19} /><span style={{ flex: 1, textAlign: 'left' }}>{c.code} — {c.name}</span><span className="muted">{c.symbol}</span>
                     </button>
                   ))}
                   <div className="muted" style={{ padding: '6px 10px', fontSize: 10.5, lineHeight: 1.4 }}>Prices convert for display; settlement is in PKR.</div>

@@ -68,6 +68,16 @@ export async function changeOrderStatus({ orderId, status, note = '', actor = 'a
     returning id
   `;
 
+  // This is a customer-confirmation request, not proof of delivery. It remains pending
+  // until the customer responds; no automated rule changes an order to delivered.
+  if (status === 'out_for_delivery' && previous !== 'out_for_delivery' && order.customer_id) {
+    await sql`insert into delivery_confirmations (order_id, customer_id, state, next_reminder_at)
+      values (${orderId}, ${order.customer_id}, 'pending', now())
+      on conflict (order_id) do update set state='pending', response_at=null,
+        reminder_count=0, created_at=now(), next_reminder_at=now()
+      where delivery_confirmations.state <> 'pending'`;
+  }
+
   // restock on cancellation
   if (status === 'cancelled' && previous !== 'cancelled') {
     const items = await sql`select product_id, variant_id, qty from order_items where order_id = ${orderId}`;

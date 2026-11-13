@@ -2,10 +2,16 @@
 import { useEffect, useState } from 'react';
 import { useStore, applyPalette } from './providers';
 import { Palette, X, Check } from './icons';
+import { FONT_OPTIONS, DEFAULT_FONTS } from '@/lib/typography';
 
 export function ThemeSwitcher() {
-  const { theme, customer, setTheme } = useStore();
+  const { theme, customer, setTheme, setFonts } = useStore();
   const [open, setOpen] = useState(false);
+  const [fontDraft, setFontDraft] = useState(theme.fonts || DEFAULT_FONTS);
+
+  useEffect(() => {
+    setFontDraft(theme.fonts || DEFAULT_FONTS);
+  }, [theme.fonts?.heading, theme.fonts?.body]);
 
   useEffect(() => {
     if (customer) return;
@@ -54,6 +60,18 @@ export function ThemeSwitcher() {
                 );
               })}
             </div>
+            {theme.allowFontOverride && (
+              <div className="personal-font-panel">
+                <div className="eyebrow">Typography</div>
+                <div className="form-row" style={{ marginTop: 8 }}>
+                  <label className="field"><span>Headings</span><select className="input" value={fontDraft.heading} onChange={(e) => setFontDraft((f) => ({ ...f, heading: e.target.value }))}>{FONT_OPTIONS.map(([name,label]) => <option key={name} value={name}>{label}</option>)}</select></label>
+                  <label className="field"><span>Body</span><select className="input" value={fontDraft.body} onChange={(e) => setFontDraft((f) => ({ ...f, body: e.target.value }))}>{FONT_OPTIONS.map(([name,label]) => <option key={name} value={name}>{label}</option>)}</select></label>
+                </div>
+                <p className="personal-font-sample" style={{ fontFamily: `'${fontDraft.heading}', Georgia, serif` }}>Considered in every detail.</p>
+                <button className="btn btn-sm" onClick={() => setFonts(fontDraft,true)}>Save my typography</button>
+                {theme.fontPersonal && <button className="btn btn-ghost btn-sm" onClick={() => setFonts(theme.defaultFonts || DEFAULT_FONTS,false)}>Use store typography</button>}
+              </div>
+            )}
             {customer && theme.source === 'customer' && (
               <button className="btn btn-outline btn-block btn-sm" style={{ marginTop: 14 }} onClick={async () => { await setTheme(null); setOpen(false); }}>
                 Reset to store default

@@ -19,16 +19,20 @@ export async function getThemeConfig() {
     } catch {
       /* defaults */
     }
-    const list = await sql`select slug, name, description, swatch, is_active from themes order by position`.catch(() => []);
-    const themes = (list.length ? list : THEMES.map((t) => ({ ...t, is_active: true }))).filter((t) => t.is_active !== false);
-    return { palette, allowOverride, themes, theme: getTheme(palette) };
+    const list = await sql`select slug, is_active from themes order by position`.catch(() => []);
+    const active = list.length ? new Set(list.filter((t) => t.is_active).map((t) => t.slug)) : null;
+    const themes = THEMES.filter((t) => !active || active.has(t.slug));
+    const row = await sql`select value from settings where key='theme' limit 1`.catch(() => []);
+    const fonts = row[0]?.value?.fonts || null;
+    const allowFontOverride = row[0]?.value?.allow_customer_font_override !== false;
+    return { palette, allowOverride, allowFontOverride, fonts, themes, theme: getTheme(palette) };
   });
 }
 
 export function resolveTheme(config, customer) {
-  if (!customer || !config.allowOverride) return { slug: config.palette, source: 'store' };
-  if (customer.theme_palette && THEMES.some((t) => t.slug === customer.theme_palette)) {
-    return { slug: customer.theme_palette, source: 'customer' };
+  const personalFonts = customer && config.allowFontOverride && customer.font_preference?.enabled ? customer.font_preference : null;
+  if (!customer || !config.allowOverride || !customer.theme_palette || !THEMES.some((t) => t.slug === customer.theme_palette)) {
+    return { slug: config.palette, source: 'store', fonts: personalFonts || config.fonts };
   }
-  return { slug: config.palette, source: 'store' };
+  return { slug: customer.theme_palette, source: 'customer', fonts: personalFonts || null };
 }
