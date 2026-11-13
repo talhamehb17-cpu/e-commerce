@@ -70,7 +70,7 @@ npm install
 cp .env.example .env.local        # then fill in the values
 
 # Local Postgres (PGlite over a socket — no Docker required)
-npm run db:local                  # terminal 1
+node scripts/_pgl.mjs             # terminal 1: serves Postgres on :55432
 npm run db:migrate                # schema is idempotent and additive
 npm run db:seed                   # brand, 30 products, 7 categories, 14 sections
 
