@@ -41,6 +41,20 @@ export function Header() {
   useEffect(() => { setMenuOpen(false); setCurrOpen(false); setCurrencyQuery(''); }, [pathname]);
 
   useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
     if (!currOpen) return;
     const onPointerDown = (event) => {
       if (!currencyMenuRef.current?.contains(event.target)) { setCurrOpen(false); setCurrencyQuery(''); }
@@ -73,7 +87,7 @@ export function Header() {
 
       <header className="site-header">
         <div className="wrap header-inner">
-          <button className="icon-btn menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Menu size={19} /></button>
+          <button className="icon-btn menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Open menu" aria-expanded={menuOpen} aria-controls="mobile-navigation"><Menu size={19} /></button>
 
           <nav className="nav">
             {NAV.slice(0, 3).map((n) => (
@@ -137,11 +151,14 @@ export function Header() {
       </header>
 
       <div className="mobile-nav" data-open={menuOpen} aria-hidden={!menuOpen}>
-        <div
+        <button
+          type="button"
+          className="mobile-nav-scrim"
           onClick={() => setMenuOpen(false)}
-          style={{ position: 'absolute', inset: 0, background: 'rgba(12,10,8,.4)', opacity: menuOpen ? 1 : 0, transition: 'opacity .4s' }}
+          aria-label="Close navigation"
+          tabIndex={menuOpen ? 0 : -1}
         />
-        <div className="mobile-nav-panel">
+        <nav id="mobile-navigation" className="mobile-nav-panel" aria-label="Mobile navigation" aria-modal={menuOpen || undefined} inert={!menuOpen}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <span className="logo" style={{ fontSize: 19 }}>{store.name}</span>
             <button className="icon-btn" onClick={() => setMenuOpen(false)} aria-label="Close menu"><X size={19} /></button>
@@ -160,7 +177,7 @@ export function Header() {
             </Link>
             {!customer && <Link href="/register" className="btn btn-block btn-sm" onClick={() => setMenuOpen(false)}>Create account</Link>}
           </div>
-        </div>
+        </nav>
       </div>
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cartState={cartState} />
