@@ -43,7 +43,7 @@ export function QuickView({ product, open, onClose, openCart }) {
   useEffect(() => { if (open) setQty(1); document.body.style.overflow = open ? 'hidden' : ''; return () => { document.body.style.overflow = ''; }; }, [open]);
   if (!product) return null;
   return (
-    <div className="modal" data-open={open} aria-hidden={!open} role="dialog" aria-label={product.name}>
+    <div className="modal" data-open={open} aria-hidden={!open} inert={!open} role="dialog" aria-modal="true" aria-label={product.name}>
       <div className="modal-scrim" onClick={onClose} />
       <div className="modal-panel">
         <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: 12, right: 12, zIndex: 3 }}><X size={18} /></button>

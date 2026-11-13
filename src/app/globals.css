@@ -677,6 +677,16 @@ html[data-style='luxury'] .review-premium-card{border-radius:2px;border-top:2px 
 .appearance-theme-name{min-width:0;font-size:12.5px;overflow-wrap:anywhere}
 .appearance-theme-check{color:var(--accent);justify-self:end}
 
+/* Accessible skip navigation and non-hover product actions. */
+.skip-link{position:fixed;top:12px;left:12px;z-index:150;transform:translateY(calc(-100% - 18px));padding:10px 16px;border-radius:8px;background:var(--ink);color:var(--bg);box-shadow:var(--shadow);transition:transform .2s var(--ease)}
+.skip-link:focus{transform:translateY(0)}
+#main:focus{outline:none}
+.faq-list{display:grid;gap:0}.faq-item{padding:clamp(18px,3vw,26px) 0;border-bottom:1px solid var(--line)}.faq-item:first-child{border-top:1px solid var(--line)}.faq-item h2{font-size:clamp(22px,3vw,30px);line-height:1.2;overflow-wrap:anywhere}.faq-item p{margin-top:9px;color:var(--muted);font-size:14.5px;line-height:1.8;overflow-wrap:anywhere}
+@media (hover:hover) and (pointer:fine){.pcard:focus-within .pcard-quick{opacity:1;transform:none}}
+@media (hover:none),(pointer:coarse){.pcard-quick{position:static;margin-top:10px;opacity:1;transform:none}.announce-track,.marquee-track{animation-play-state:paused}}
+.announce:active .announce-track,.marquee:active .marquee-track{animation-play-state:paused}
+.modal-panel{max-height:min(92vh,calc(100vh - 32px));max-height:min(92dvh,calc(100dvh - 32px));overscroll-behavior:contain}
+
 @media(max-width:720px){
   .header-inner{grid-template-columns:auto minmax(0,1fr) auto;gap:8px}
   .logo{font-size:20px;letter-spacing:.18em;padding-left:.18em;white-space:nowrap;justify-self:center}

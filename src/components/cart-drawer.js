@@ -78,7 +78,7 @@ export function CartDrawer({ open, onClose, cartState }) {
   }, [open]);
 
   return (
-    <div className="drawer" data-open={open} aria-hidden={!open}>
+    <div className="drawer" data-open={open} aria-hidden={!open} inert={!open}>
       <div className="drawer-scrim" onClick={onClose} />
       <aside className="drawer-panel" role="dialog" aria-label="Shopping bag">
         <div className="drawer-head">

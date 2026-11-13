@@ -22,6 +22,8 @@ export function ThemeSwitcher() {
 
   useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     closeRef.current?.focus();
     const onKeyDown = (event) => {
       if (event.key === 'Escape') closeDialog();
@@ -35,7 +37,10 @@ export function ThemeSwitcher() {
     };
     const dialog = document.querySelector('[data-appearance-dialog]');
     dialog?.addEventListener('keydown', onKeyDown);
-    return () => dialog?.removeEventListener('keydown', onKeyDown);
+    return () => {
+      dialog?.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -49,7 +54,7 @@ export function ThemeSwitcher() {
   return (
     <>
       <button ref={openerRef} className="icon-btn" onClick={() => setOpen(true)} aria-label="Change appearance" title="Appearance"><Palette size={18} /></button>
-      <div className="modal appearance-modal" data-appearance-dialog data-open={open} aria-hidden={!open} role="dialog" aria-modal="true" aria-labelledby="appearance-title">
+      <div className="modal appearance-modal" data-appearance-dialog data-open={open} aria-hidden={!open} inert={!open} role="dialog" aria-modal="true" aria-labelledby="appearance-title">
         <div className="modal-scrim" onClick={closeDialog} />
         <div className="modal-panel appearance-panel">
           <div className="appearance-dialog-head">

@@ -86,7 +86,7 @@ OTP codes may be returned by the API in non-production development only; product
 1. Push this repo to GitHub.
 2. Import it in Vercel; the framework preset is detected automatically.
 3. Add the environment variables from `.env.example` (production scope). At minimum:
-   `DATABASE_URL`, `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `NEXT_PUBLIC_SITE_URL`.
+   `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`; set `ADMIN_EMAIL` and `ADMIN_PASSWORD` only when seeding a database that does not yet contain an admin. See `ENVIRONMENT_VARIABLES_SETUP.md` for the complete inventory.
    Add the SMTP and S3 values to enable email and image uploads.
 4. Deploy. The build runs `scripts/deploy-db.mjs`, which applies the schema and seeds the
    catalogue idempotently — safe to run on every deploy, and it never drops data.

@@ -41,7 +41,7 @@ export function SearchModal({ open, onClose }) {
   }, [q]);
 
   return (
-    <div className="modal" data-open={open} aria-hidden={!open} role="dialog" aria-label="Search">
+    <div className="modal" data-open={open} aria-hidden={!open} inert={!open} role="dialog" aria-modal="true" aria-label="Search">
       <div className="modal-scrim" onClick={onClose} />
       <div className="modal-panel" style={{ width: 'min(680px,100%)', alignSelf: 'start', marginTop: '9vh' }}>
         <form

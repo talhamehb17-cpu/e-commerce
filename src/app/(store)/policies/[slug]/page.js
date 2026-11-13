@@ -9,7 +9,14 @@ const POLICIES = {
   returns: { title: 'Returns & refunds', body: (s) => `You have ${s.return_window_days} days from delivery to return unused items in their original packaging.\n\nStart a return from your order page or email us. Once we receive the item we inspect it and refund within 5 business days to the original payment method. Cash-on-delivery orders are refunded by bank transfer or Easypaisa.\n\nItems that are damaged or faulty on arrival are replaced or refunded in full — we cover return shipping in Pakistan.` },
   privacy: { title: 'Privacy policy', body: () => `We collect only what we need to fulfil your order: your name, contact details, delivery address and order history.\n\nWe never sell your data. Payment details are never stored on our servers. Email is used for order updates and, if you opt in, one weekly newsletter you can unsubscribe from in a click.\n\nYou can request a copy of your data or ask us to delete your account at any time by emailing us.` },
   terms: { title: 'Terms of service', body: () => `By placing an order you agree to these terms.\n\nPrices are shown in your selected display currency but settled in PKR. Currency conversions are indicative and may vary slightly with your bank.\n\nProduct photography is representative; small variations in colour and finish are normal.\n\nWe reserve the right to cancel an order if an item is mispriced or out of stock, and will refund in full if we do.` },
-  faq: { title: 'FAQ', body: () => `How long does delivery take?\nStandard delivery is 3–5 business days; express is 1–2.\n\nCan I change my order?\nYou can change an order until it ships. Email us with your order number.\n\nDo you ship internationally?\nYes. International shipping is calculated at checkout.\n\nHow do I know my size?\nEach product page lists measurements. When between sizes, we recommend sizing up.\n\nIs cash on delivery available?\nYes, across Pakistan.\n\nHow do I track my order?\nOpen your order page from the account area — the timeline updates as the status changes.` },
+  faq: { title: 'FAQ', items: [
+    ['How long does delivery take?', 'Standard delivery is 3–5 business days; express is 1–2.'],
+    ['Can I change my order?', 'You can change an order until it ships. Email us with your order number.'],
+    ['Do you ship internationally?', 'Yes. International shipping is calculated at checkout.'],
+    ['How do I know my size?', 'Each product page lists measurements. When between sizes, we recommend sizing up.'],
+    ['Is cash on delivery available?', 'Yes, across Pakistan.'],
+    ['How do I track my order?', 'Open your order page from the account area — the timeline updates as the status changes.'],
+  ] },
 };
 
 export async function generateStaticParams() {
@@ -36,7 +43,18 @@ export default async function PolicyPage({ params }) {
         </div>
       </div>
       <div className="wrap narrow section-tight">
-        <div style={{ whiteSpace: 'pre-line', fontSize: 14.5, lineHeight: 1.85, color: 'var(--muted)' }}>{policy.body(shipping)}</div>
+        {policy.items ? (
+          <div className="faq-list">
+            {policy.items.map(([question, answer]) => (
+              <section className="faq-item" key={question}>
+                <h2>{question}</h2>
+                <p>{answer}</p>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div style={{ whiteSpace: 'pre-line', fontSize: 14.5, lineHeight: 1.85, color: 'var(--muted)' }}>{policy.body(shipping)}</div>
+        )}
       </div>
     </>
   );

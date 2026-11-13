@@ -6,7 +6,7 @@ export default function StoreLayout({ children }) {
     <>
       <a href="#main" className="skip-link">Skip to content</a>
       <Header />
-      <main id="main">{children}</main>
+      <main id="main" tabIndex={-1}>{children}</main>
       <Footer />
     </>
   );

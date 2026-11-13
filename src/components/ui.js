@@ -43,7 +43,7 @@ export function ProductCard({ product, money, priority = false, saved = false, o
       </div>
 
       <div className="pcard-quick">
-        <button type="button" className="btn" disabled={product.stock === 0} onClick={() => onAdd?.(product)}>
+        <button type="button" className="btn" aria-label={product.stock === 0 ? `${product.name} is sold out` : `${product.variantCount > 0 ? 'Choose options for' : 'Add'} ${product.name} to bag`} disabled={product.stock === 0} onClick={() => onAdd?.(product)}>
           {product.stock === 0 ? 'Sold out' : product.variantCount > 0 ? 'Choose options' : 'Add to bag'}
         </button>
       </div>
