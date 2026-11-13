@@ -8,9 +8,11 @@
     "start": "next start -p 3000",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed.mjs",
-    "db:deploy": "node scripts/migrate.mjs && node scripts/seed.mjs",
+    "db:deploy": "node scripts/migrate.mjs && node scripts/seed.mjs && node scripts/sync-settings.mjs",
     "postinstall": "echo skip",
-    "build:local": "DEPLOY_DB=0 next build"
+    "build:local": "DEPLOY_DB=0 next build",
+    "db:local": "node scripts/_pgl.mjs",
+    "db:sync": "node --env-file=.env.local scripts/sync-settings.mjs"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20",

@@ -15,7 +15,7 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-for (const script of ['scripts/migrate.mjs', 'scripts/seed.mjs']) {
+for (const script of ['scripts/migrate.mjs', 'scripts/seed.mjs', 'scripts/sync-settings.mjs']) {
   const res = spawnSync(process.execPath, [script], { stdio: 'inherit', env: process.env });
   if (res.status !== 0) {
     console.error(`✖ ${script} failed with exit code ${res.status}`);

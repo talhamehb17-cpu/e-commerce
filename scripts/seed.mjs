@@ -14,10 +14,10 @@ const CATEGORIES = [
   ['electronics', 'Electronics', 'Audio, wearables and everyday tech.', 'electronics', true],
   ['fashion', 'Fashion', 'Outerwear, knitwear and wardrobe staples.', 'fashion', true],
   ['shoes', 'Shoes', 'Sneakers, boots and refined everyday footwear.', 'shoes', true],
-  ['home', 'Home & Living', 'Lighting, ceramics and textiles for slow living.', 'home', true],
-  ['beauty', 'Beauty', 'Skincare and self-care, formulated simply.', 'beauty', true],
-  ['sports', 'Sports & Fitness', 'Training gear built for daily movement.', 'sports', true],
-  ['bags', 'Bags & Accessories', 'Leather goods and carry essentials.', 'bags', true],
+  ['home', 'Home & Living', 'Lighting, ceramics and textiles for slow living.', 'home-lamp-1', true],
+  ['beauty', 'Beauty', 'Skincare and self-care, formulated simply.', 'beauty-serum-1', true],
+  ['sports', 'Sports & Fitness', 'Training gear built for daily movement.', 'sports-yoga-mat-1', true],
+  ['bags', 'Bags & Accessories', 'Leather goods and carry essentials.', 'bags-tote-1', true],
 ];
 
 const BRANDS = [
@@ -127,6 +127,52 @@ async function upsertCategory(slug, name, description, imageKey, isFeatured, pos
   return r[0].id;
 }
 
+
+/** Distinct photography per product (all files live in public/images/products). */
+const PRODUCT_IMAGES = {
+  'Aurora Wireless Headphones': 'electronics-headphones-1',
+  'Atlas Smartwatch Series 3': 'electronics-smartwatch-1',
+  'Quiet Studio Earbuds': 'electronics-earbuds-1',
+  'Meridian Bluetooth Speaker': 'electronics-speaker-1',
+  'Halden Wool Overcoat': 'fashion-coat-1',
+  'Ribbed Merino Crewneck': 'fashion-knit-1',
+  'Everyday Poplin Shirt': 'fashion-shirt-1',
+  'Cropped Utility Jacket': 'fashion-coat-1',
+  'Motion Runner Low': 'shoes-sneakers-1',
+  'Court Classic Sneaker': 'shoes-sneakers-1',
+  'Terra Trail Boot': 'shoes-boot-1',
+  'Slip-On Loafer': 'shoes-loafer-1',
+  'Sculpted Ceramic Table Lamp': 'home-lamp-1',
+  'Stoneware Dinner Set (4)': 'home-ceramics-1',
+  'Linen Bedding Set': 'home-throw-1',
+  'Oak Side Table': 'home-table-1',
+  'Woven Wool Throw': 'home-throw-1',
+  'Balance Hydrating Serum': 'beauty-serum-1',
+  'Gentle Cleansing Gel': 'beauty-serum-1',
+  'Daily Mineral SPF 50': 'beauty-cream-1',
+  'Overnight Repair Cream': 'beauty-cream-1',
+  'Pro Grip Yoga Mat': 'sports-yoga-mat-1',
+  'Adjustable Dumbbell Pair': 'sports-yoga-mat-1',
+  'Trail Running Pack 18L': 'bags-tote-1',
+  'Recovery Foam Roller': 'sports-yoga-mat-1',
+  'Carry Structured Tote': 'bags-tote-1',
+  'Weekender Duffle 45L': 'bags-tote-1',
+  'Minimal Card Holder': 'bags-tote-1',
+  'Everyday Crossbody': 'bags-tote-1',
+  'Canvas Market Tote': 'bags-tote-1',
+};
+
+/** Second image shown on card hover, per category. */
+const HOVER_IMAGES = {
+  electronics: '/images/hero/hero-side.jpg',
+  fashion: '/images/hero/hero-main.jpg',
+  shoes: '/images/hero/hero-side.jpg',
+  home: '/images/hero/hero-main.jpg',
+  beauty: '/images/hero/hero-side.jpg',
+  sports: '/images/hero/hero-main.jpg',
+  bags: '/images/hero/hero-side.jpg',
+};
+
 async function main() {
   console.log('→ seeding general catalogue…');
 
@@ -153,7 +199,7 @@ async function main() {
   for (let i = 0; i < PRODUCTS.length; i++) {
     const [name, cat, brand, price, compare, stock, badge, featured, material, subtitle, description] = PRODUCTS[i];
     const slug = slugify(name);
-    const primary = `/images/products/${catImage[cat]}.jpg`;
+    const primary = `/images/products/${PRODUCT_IMAGES[name] || catImage[cat]}.jpg`;
     manifest[slug] = { name, category: cat };
 
     const existing = await sql`select id from products where slug = ${slug} limit 1`;
@@ -181,12 +227,10 @@ async function main() {
     }
 
     const imgCount = await sql`select count(*)::int n from product_images where product_id = ${id}`;
-    if (imgCount[0].n === 0) {
-      const gallery = [
-        primary,
-        `/images/hero/hero-${cat === 'electronics' ? 'side' : 'main'}.jpg`,
-        `/images/products/${catImage[cat]}.jpg`,
-      ];
+    const stale = await sql`select count(*)::int n from product_images where product_id = ${id} and url not like '/images/products/%'`;
+    if (imgCount[0].n === 0 || stale[0].n > 0) {
+      await sql`delete from product_images where product_id = ${id}`;
+      const gallery = [primary, HOVER_IMAGES[cat] || '/images/hero/hero-main.jpg'];
       const unique = [...new Set(gallery)];
       for (let p = 0; p < unique.length; p++) {
         await sql`insert into product_images (product_id, url, alt, position) values (${id}, ${unique[p]}, ${name}, ${p})`;
@@ -269,9 +313,9 @@ async function main() {
     ['marquee', 'marquee', null, null, null, null, null, null, { items: ['Free delivery over Rs 15,000', '30-day easy returns', 'Cash on delivery', '2-year quality promise'] }],
     ['categories', 'categories', 'Shop by category', 'Seven departments, one standard of making.', 'Departments', null, null, null, { limit: 7 }],
     ['featured', 'products', 'Featured this week', 'A handpicked edit across the store, refreshed every week.', 'The edit', null, 'View all', '/shop', { source: 'featured', limit: 8 }],
-    ['promo', 'banner', 'The Wardrobe Edit', 'Outerwear, knitwear and footwear built to layer. New season arrivals across every category.', 'Seasonal', '/images/banners/seasonal-edit.jpg', 'Shop the edit', '/collections/the-wardrobe-edit', { align: 'left' }],
+    ['promo', 'banner', 'The Wardrobe Edit', 'Outerwear, knitwear and footwear built to layer. New season arrivals across every category.', 'Seasonal', '/images/products/fashion-coat-1.jpg', 'Shop the edit', '/collections/the-wardrobe-edit', { align: 'left' }],
     ['new', 'products', 'New arrivals', 'Fresh in across tech, fashion, home and beauty.', 'Just landed', null, 'View all', '/collections/new-arrivals', { source: 'new', limit: 4 }],
-    ['story', 'story', 'Chosen, not stocked', 'We are a small buying team, not a marketplace. Every product is sampled in person, used for weeks, and only listed if it survives real life. That is why the catalogue grows slowly and why we happily tell you which items we would buy ourselves.', 'Our story', '/images/editorial/studio.jpg', 'Read more', '/about', { portrait: '/images/editorial/lifestyle-1.jpg' }],
+    ['story', 'story', 'Chosen, not stocked', 'We are a small buying team, not a marketplace. Every product is sampled in person, used for weeks, and only listed if it survives real life. That is why the catalogue grows slowly and why we happily tell you which items we would buy ourselves.', 'Our story', '/images/hero/hero-main.jpg', 'Read more', '/about', { portrait: '/images/hero/hero-side.jpg' }],
     ['bestsellers', 'products', 'Best sellers', 'The products customers come back for, across every department.', 'Most loved', null, 'View all', '/collections/best-sellers', { source: 'bestsellers', limit: 4 }],
     ['collection-grid', 'collections', 'Collections', 'Seasonal edits and curated sets for every part of life.', 'Curated', null, null, null, {}],
     ['brands', 'brands', 'Brands we carry', 'Independent makers and in-house labels worth knowing.', 'The makers', null, null, null, {}],
