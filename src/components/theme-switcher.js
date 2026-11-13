@@ -49,38 +49,39 @@ export function ThemeSwitcher() {
   return (
     <>
       <button ref={openerRef} className="icon-btn" onClick={() => setOpen(true)} aria-label="Change appearance" title="Appearance"><Palette size={18} /></button>
-      <div className="modal" data-appearance-dialog data-open={open} aria-hidden={!open} role="dialog" aria-modal="true" aria-labelledby="appearance-title">
+      <div className="modal appearance-modal" data-appearance-dialog data-open={open} aria-hidden={!open} role="dialog" aria-modal="true" aria-labelledby="appearance-title">
         <div className="modal-scrim" onClick={closeDialog} />
-        <div className="modal-panel" style={{ width: 'min(520px,100%)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 22px', borderBottom: '1px solid var(--line)' }}>
+        <div className="modal-panel appearance-panel">
+          <div className="appearance-dialog-head">
             <div>
               <div className="eyebrow">Appearance</div>
-              <h3 id="appearance-title" style={{ fontSize: 22, marginTop: 2 }}>Choose your palette</h3>
+              <h3 id="appearance-title">Choose your palette</h3>
             </div>
-            <button ref={closeRef} className="icon-btn" onClick={closeDialog} aria-label="Close appearance dialog"><X size={18} /></button>
+            <button ref={closeRef} className="icon-btn appearance-close" onClick={closeDialog} aria-label="Close appearance dialog"><X size={20} /></button>
           </div>
-          <div style={{ padding: 22 }}>
+          <div className="appearance-dialog-body">
             <p className="muted" style={{ fontSize: 12.5, marginBottom: 16 }}>
               {customer
                 ? 'Your choice is saved to your account and only affects your experience.'
                 : 'Sign in to keep your palette across devices. Guests save locally in this browser.'}
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="appearance-theme-grid">
               {theme.themes?.map((t) => {
                 const on = t.slug === theme.slug;
                 return (
                   <button
                     key={t.slug}
+                    className="appearance-theme-option"
+                    data-selected={on}
                     onClick={() => { setTheme(t.slug); closeDialog(); }}
-                    style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 12, borderRadius: 12, border: `1px solid ${on ? 'var(--ink)' : 'var(--line)'}`, background: 'var(--surface)', textAlign: 'left' }}
                   >
-                    <span style={{ display: 'flex' }}>
+                    <span className="appearance-theme-swatches">
                       {(Array.isArray(t.swatch) ? t.swatch : ['#f7f2ea', '#c8a96a', '#16130f']).map((c, i) => (
-                        <i key={i} style={{ width: 15, height: 15, borderRadius: '50%', background: c, marginLeft: i ? -4 : 0, border: '1px solid rgba(0,0,0,.12)' }} />
+                        <i key={i} style={{ background: c }} />
                       ))}
                     </span>
-                    <span style={{ flex: 1, fontSize: 12.5 }}>{t.name}</span>
-                    {on && <Check size={14} style={{ color: 'var(--accent)' }} />}
+                    <span className="appearance-theme-name">{t.name}</span>
+                    {on && <Check className="appearance-theme-check" size={16} />}
                   </button>
                 );
               })}
