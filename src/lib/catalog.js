@@ -131,7 +131,7 @@ export function shapeProduct(r) {
     categorySlug: r.category_slug,
     categoryName: r.category_name,
     image: resolveImage(r.image, r.category_slug, 0),
-    image2: resolveImage(r.image2, r.category_slug, 1),
+    image2: r.image2 ? resolveImage(r.image2, r.category_slug, 1) : null,
     variantCount: r.variant_count ?? 0,
     createdAt: r.created_at,
   };
@@ -155,11 +155,7 @@ export async function getProductBySlug(slug) {
   ]);
   const gallery = images.length
     ? images.map((i) => ({ ...i, url: resolveImage(i.url, p.category_slug, i.position) }))
-    : [
-        { url: resolveImage(null, p.category_slug, 0), alt: p.name },
-        { url: resolveImage(null, p.category_slug, 1), alt: p.name },
-        { url: resolveImage(null, p.category_slug, 2), alt: p.name },
-      ];
+    : [{ url: resolveImage(null, p.category_slug, 0), alt: p.name, position: 0 }];
   return {
     ...shapeProduct({ ...p, image: gallery[0].url, image2: gallery[1]?.url }),
     description: p.description,
