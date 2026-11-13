@@ -5,6 +5,12 @@ import { ShopBrowser } from '@/components/shop-browser';
 
 export const dynamic = 'force-dynamic';
 
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const title = slug.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  return { title: `${title} · NOVA` };
+}
+
 export default async function CollectionPage({ params, searchParams }) {
   const { slug } = await params;
   const sp = await searchParams;
