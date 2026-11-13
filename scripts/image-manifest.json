@@ -1,0 +1,122 @@
+{
+  "aurora-wireless-headphones": {
+    "name": "Aurora Wireless Headphones",
+    "category": "electronics"
+  },
+  "atlas-smartwatch-series-3": {
+    "name": "Atlas Smartwatch Series 3",
+    "category": "electronics"
+  },
+  "quiet-studio-earbuds": {
+    "name": "Quiet Studio Earbuds",
+    "category": "electronics"
+  },
+  "meridian-bluetooth-speaker": {
+    "name": "Meridian Bluetooth Speaker",
+    "category": "electronics"
+  },
+  "halden-wool-overcoat": {
+    "name": "Halden Wool Overcoat",
+    "category": "fashion"
+  },
+  "ribbed-merino-crewneck": {
+    "name": "Ribbed Merino Crewneck",
+    "category": "fashion"
+  },
+  "everyday-poplin-shirt": {
+    "name": "Everyday Poplin Shirt",
+    "category": "fashion"
+  },
+  "cropped-utility-jacket": {
+    "name": "Cropped Utility Jacket",
+    "category": "fashion"
+  },
+  "motion-runner-low": {
+    "name": "Motion Runner Low",
+    "category": "shoes"
+  },
+  "court-classic-sneaker": {
+    "name": "Court Classic Sneaker",
+    "category": "shoes"
+  },
+  "terra-trail-boot": {
+    "name": "Terra Trail Boot",
+    "category": "shoes"
+  },
+  "slip-on-loafer": {
+    "name": "Slip-On Loafer",
+    "category": "shoes"
+  },
+  "sculpted-ceramic-table-lamp": {
+    "name": "Sculpted Ceramic Table Lamp",
+    "category": "home"
+  },
+  "stoneware-dinner-set-4": {
+    "name": "Stoneware Dinner Set (4)",
+    "category": "home"
+  },
+  "linen-bedding-set": {
+    "name": "Linen Bedding Set",
+    "category": "home"
+  },
+  "oak-side-table": {
+    "name": "Oak Side Table",
+    "category": "home"
+  },
+  "woven-wool-throw": {
+    "name": "Woven Wool Throw",
+    "category": "home"
+  },
+  "balance-hydrating-serum": {
+    "name": "Balance Hydrating Serum",
+    "category": "beauty"
+  },
+  "gentle-cleansing-gel": {
+    "name": "Gentle Cleansing Gel",
+    "category": "beauty"
+  },
+  "daily-mineral-spf-50": {
+    "name": "Daily Mineral SPF 50",
+    "category": "beauty"
+  },
+  "overnight-repair-cream": {
+    "name": "Overnight Repair Cream",
+    "category": "beauty"
+  },
+  "pro-grip-yoga-mat": {
+    "name": "Pro Grip Yoga Mat",
+    "category": "sports"
+  },
+  "adjustable-dumbbell-pair": {
+    "name": "Adjustable Dumbbell Pair",
+    "category": "sports"
+  },
+  "trail-running-pack-18l": {
+    "name": "Trail Running Pack 18L",
+    "category": "sports"
+  },
+  "recovery-foam-roller": {
+    "name": "Recovery Foam Roller",
+    "category": "sports"
+  },
+  "carry-structured-tote": {
+    "name": "Carry Structured Tote",
+    "category": "bags"
+  },
+  "weekender-duffle-45l": {
+    "name": "Weekender Duffle 45L",
+    "category": "bags"
+  },
+  "minimal-card-holder": {
+    "name": "Minimal Card Holder",
+    "category": "bags"
+  },
+  "everyday-crossbody": {
+    "name": "Everyday Crossbody",
+    "category": "bags"
+  },
+  "canvas-market-tote": {
+    "name": "Canvas Market Tote",
+    "category": "bags"
+  }
+}

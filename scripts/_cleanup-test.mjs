@@ -1,0 +1,11 @@
+import postgres from 'postgres';
+const sql = postgres(process.env.DATABASE_URL, { max: 2 });
+await sql`delete from products where name like 'Admin Test%' or name like '%(copy)%'`;
+await sql`delete from categories where name like 'Test Cat%'`;
+await sql`delete from homepage_sections where key like 'test-%'`;
+await sql`delete from coupons where code like 'J%' and length(code) < 6`;
+await sql`delete from admins where email = 'ops@novastore.com'`;
+const c = await sql`select count(*)::int n from products where is_active`;
+const s = await sql`select count(*)::int n from homepage_sections where is_active`;
+console.log('active products', c[0].n, '| active sections', s[0].n);
+await sql.end();
