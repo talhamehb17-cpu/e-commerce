@@ -22,23 +22,3 @@ for (const script of ['scripts/migrate.mjs', 'scripts/seed.mjs', 'scripts/sync-s
     process.exit(res.status || 1);
   }
 }
-
-// Temporary Vercel-preview-only owner recovery. Remove the scoped variables immediately after use.
-if (process.env.NOVA_ADMIN_RESET_PASSWORD_ONCE) {
-  const expectedBranch = 'arena/f7636a7d-e-commerce';
-  const permitted = process.env.VERCEL_ENV === 'preview'
-    && process.env.VERCEL_GIT_COMMIT_REF === expectedBranch
-    && process.env.NOVA_ADMIN_RESET_CONFIRM === 'reset-owner-once';
-  if (!permitted) {
-    console.error('✖ Refusing admin recovery outside its confirmed Vercel preview branch.');
-    process.exit(1);
-  }
-  const res = spawnSync(process.execPath, ['scripts/set-admin-password.mjs'], {
-    stdio: 'inherit',
-    env: { ...process.env, ADMIN_PASSWORD: process.env.NOVA_ADMIN_RESET_PASSWORD_ONCE },
-  });
-  if (res.status !== 0) {
-    console.error(`✖ Vercel preview owner recovery failed with exit code ${res.status}`);
-    process.exit(res.status || 1);
-  }
-}
