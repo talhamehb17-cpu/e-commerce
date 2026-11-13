@@ -3,7 +3,7 @@ import { ContactForm } from '@/components/contact-form';
 import { getSetting } from '@/lib/settings';
 import { Mail, Phone, MapPin } from '@/components/icons';
 
-export const metadata = { title: 'Contact us' };
+export const metadata = { title: 'Contact us', description: 'Get in touch with the NOVA team for help with orders and products.', alternates: { canonical: '/contact' } };
 
 export default async function ContactPage() {
   const store = await getSetting('store');

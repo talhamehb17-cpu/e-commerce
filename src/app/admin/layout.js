@@ -1,6 +1,6 @@
 import '../globals.css';
 import { redirect } from 'next/navigation';
-import { getCurrentAdmin } from '@/lib/auth';
+import { getCurrentAdmin, can } from '@/lib/auth';
 import { AdminShell } from '@/components/admin/shell';
 import { sql } from '@/lib/db';
 
@@ -33,6 +33,7 @@ export default async function AdminLayout({ children }) {
   return (
     <AdminShell
       admin={{ id: admin.id, name: admin.name, email: admin.email, role: admin.role, avatar: admin.avatar_url }}
+      adminAccess={{ products: can(admin, 'products:read'), orders: can(admin, 'orders:read'), customers: can(admin, 'customers:read'), reviews: can(admin, 'reviews:read'), content: can(admin, 'content:read'), settings: can(admin, 'settings:read') }}
       badges={{ orders: pending[0].n, inventory: lowStock[0].n, reviews: pendingReviews[0].n }}
     >
       {children}

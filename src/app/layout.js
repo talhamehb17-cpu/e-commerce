@@ -16,8 +16,9 @@ export const metadata = {
   title: { default: 'NOVA — Everything, considered.', template: '%s · NOVA' },
   description:
     'A multi-category store for electronics, fashion, home, beauty, sport and everyday carry — chosen by hand, shipped worldwide.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
-  openGraph: { title: 'NOVA', description: 'Everything, considered.', images: ['/images/hero/hero-main.jpg'] },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://nova-commerce-eight.vercel.app')),
+  openGraph: { type: 'website', title: 'NOVA', description: 'Everything, considered.', images: ['/images/hero/hero-main.jpg'] },
+  twitter: { card: 'summary_large_image', title: 'NOVA — Everything, considered.', description: 'A curated multi-category store for everyday essentials.' },
   robots: { index: true, follow: true },
 };
 
@@ -67,6 +68,14 @@ export default async function RootLayout({ children }) {
   } catch { /* ignore */ }
 
   const meta = await getCatalogueMeta();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://nova-commerce-eight.vercel.app');
+  const storeSchema = {
+    '@context': 'https://schema.org', '@type': 'Store', name: store.name || 'NOVA', url: siteUrl,
+    image: `${siteUrl.replace(/\/$/, '')}/images/hero/hero-main.jpg`,
+    address: { '@type': 'PostalAddress', addressLocality: 'Lahore', addressCountry: 'PK' },
+    ...(store.email ? { email: store.email } : {}),
+    sameAs: [store.instagram, store.facebook].filter((url) => typeof url === 'string' && /^https:\/\//i.test(url)),
+  };
   const defaultCurrency = currencies.find((c) => c.isDefault)?.code || 'PKR';
   const now = Date.now();
   const announcementStart = store.announcement_starts_at ? Date.parse(`${store.announcement_starts_at.slice(0, 10)}T00:00:00Z`) : null;
@@ -81,6 +90,7 @@ export default async function RootLayout({ children }) {
         <link rel="preload" href="/images/fonts/inter.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(storeSchema).replace(/</g, '\\u003c') }} />
         <StoreProvider
           initial={{
             customer: customer ? { id: customer.id, name: customer.name, email: customer.email, avatar: customer.avatar_url, verified: customer.email_verified } : null,

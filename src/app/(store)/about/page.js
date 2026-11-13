@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Breadcrumb } from '@/components/ui';
 
-export const metadata = { title: 'Our story' };
+export const metadata = { title: 'Our story', description: 'Learn about NOVA and our considered approach to everyday essentials.', alternates: { canonical: '/about' } };
 
 export default function AboutPage() {
   return (

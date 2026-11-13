@@ -13,6 +13,7 @@ export async function POST(request) {
 
   const { data, error } = await parse(request, schemas.forgot);
   if (error) return fail(error, 422);
+  if (process.env.NODE_ENV === 'production' && !emailConfigured()) return fail('Password reset email is temporarily unavailable. Please contact support.', 503);
 
   const rows = await sql`select id, name from customers where email = ${data.email}`;
   // Always answer the same way so we never reveal which emails exist.
@@ -24,5 +25,5 @@ export async function POST(request) {
     const tpl = templates.otp({ name: rows[0].name, code, purpose: 'reset_password', storeName: store.name });
     await sendMail({ to: data.email, subject: tpl.subject, html: tpl.html, template: 'password_reset', customerId: rows[0].id });
   }
-  return ok({ sent: true, devCode: emailConfigured() ? undefined : code });
+  return ok({ sent: true, devCode: process.env.NODE_ENV === 'production' || emailConfigured() ? undefined : code });
 }

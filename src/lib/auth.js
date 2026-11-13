@@ -82,12 +82,12 @@ export async function getCurrentAdmin() {
 
 const ROLE_PERMISSIONS = {
   // Managers run the store day to day but cannot touch store-wide settings.
-  manager: ['products:read', 'products:write', 'orders:read', 'orders:write', 'customers:read', 'customers:write',
+  manager: ['dashboard:read', 'products:read', 'products:write', 'orders:read', 'orders:write', 'customers:read', 'customers:write',
     'reviews:read', 'reviews:write', 'content:read', 'content:write', 'settings:read'],
   // Staff work orders and customers only.
-  staff: ['products:read', 'orders:read', 'orders:write', 'customers:read', 'customers:write', 'reviews:read'],
+  staff: ['dashboard:read', 'products:read', 'orders:read', 'orders:write', 'customers:read', 'customers:write', 'reviews:read'],
   // Viewers can look but never change anything.
-  viewer: ['products:read', 'orders:read', 'customers:read', 'reviews:read', 'content:read', 'settings:read'],
+  viewer: ['dashboard:read', 'products:read', 'orders:read', 'customers:read', 'reviews:read', 'content:read', 'settings:read'],
 };
 
 export function can(admin, perm) {

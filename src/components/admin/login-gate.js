@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, ArrowRight } from '../icons';
+import { Lock, ArrowRight, Eye, EyeOff } from '../icons';
 
 /**
  * Rendered instead of the dashboard when no admin session exists.
@@ -14,6 +14,7 @@ export function LoginGate() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => { setReady(true); }, []);
 
@@ -49,13 +50,13 @@ export function LoginGate() {
           </div>
           <div className="field">
             <label htmlFor="apw">Password</label>
-            <input id="apw" type="password" required autoComplete="current-password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" />
+            <div className="password-input-wrap"><input id="apw" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
           </div>
           <button className="btn btn-block" disabled={busy || !ready}>
             {busy ? 'Signing in…' : <><Lock size={14} /> Sign in to admin</>}
           </button>
           <p className="muted" style={{ fontSize: 11, marginTop: 14, lineHeight: 1.5, textAlign: 'center' }}>
-            Credentials are set by ADMIN_EMAIL and ADMIN_PASSWORD in your environment.
+            The owner account is created during the secure seed/setup step; it has no default password.
           </p>
         </form>
         <div className="center" style={{ marginTop: 16 }}>

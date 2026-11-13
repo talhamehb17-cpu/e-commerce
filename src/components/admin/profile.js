@@ -58,19 +58,19 @@ export function AdminProfile() {
         <div className="panel">
           <div className="panel-head"><h3><KeyRound size={15} /> Password</h3></div>
           <div className="field"><label>Current password</label><input className="input" type="password" value={pw.currentPassword} onChange={(e) => setPw({ ...pw, currentPassword: e.target.value })} /></div>
-          <div className="field"><label>New password</label><input className="input" type="password" value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} /></div>
+          <div className="field"><label>New password (12+ characters)</label><input className="input" type="password" value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} /></div>
           <div className="field"><label>Confirm new password</label><input className="input" type="password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} /></div>
           <button
             className="btn"
             onClick={async () => {
-              if (pw.newPassword.length < 8) return toast('Use at least 8 characters', 'error');
+              if (pw.newPassword.length < 12) return toast('Use at least 12 characters', 'error');
               if (pw.newPassword !== pw.confirm) return toast('Passwords do not match', 'error');
               const ok = await patch({ currentPassword: pw.currentPassword, newPassword: pw.newPassword }, 'Password changed');
               if (ok) setPw({ currentPassword: '', newPassword: '', confirm: '' });
             }}
           >Update password</button>
           <div className="notice" style={{ marginTop: 16, fontSize: 11.5 }}>
-            Passwords are hashed with scrypt and never stored or logged in plain text. Sessions expire after 7 days.
+            Passwords are hashed with scrypt and never stored or logged in plain text. Other active admin sessions are revoked after a password change.
           </div>
         </div>
       </div>

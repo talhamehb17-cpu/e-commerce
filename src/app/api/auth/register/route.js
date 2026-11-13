@@ -14,6 +14,7 @@ export async function POST(request) {
 
   const { data, error } = await parse(request, schemas.register);
   if (error) return fail(error, 422);
+  if (process.env.NODE_ENV === 'production' && !emailConfigured()) return fail('Email verification is temporarily unavailable. Please contact support.', 503);
 
   const existing = await sql`select id, password_hash from customers where email = ${data.email}`;
   if (existing[0]?.password_hash) return fail('An account with that email already exists. Sign in instead.', 409);
@@ -51,6 +52,6 @@ export async function POST(request) {
   return ok({
     customer: { id: customerId, name: data.name, email: data.email, verified: false },
     verificationRequired: true,
-    devCode: emailConfigured() ? undefined : code,
+    devCode: process.env.NODE_ENV === 'production' || emailConfigured() ? undefined : code,
   });
 }

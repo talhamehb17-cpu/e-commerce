@@ -7,6 +7,7 @@ export const revalidate = 30;
 
 export const metadata = {
   title: 'NOVA — Everything, considered.',
+  alternates: { canonical: '/' },
   description: 'One considered store for electronics, wardrobe, home, beauty, sport and everyday carry.',
 };
 

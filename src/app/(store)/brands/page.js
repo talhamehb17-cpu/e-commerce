@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getBrands } from '@/lib/catalog';
 import { Breadcrumb } from '@/components/ui';
 
-export const metadata = { title: 'Brands' };
+export const metadata = { title: 'Brands', description: 'Discover the brands selected by NOVA.', alternates: { canonical: '/brands' } };
 export const revalidate = 60;
 
 export default async function BrandsPage() {

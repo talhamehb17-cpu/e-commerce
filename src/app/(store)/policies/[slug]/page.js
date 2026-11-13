@@ -18,7 +18,8 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  return { title: POLICIES[slug]?.title || 'Policy' };
+  const title = POLICIES[slug]?.title || 'Policy';
+  return { title, description: `${title} information for NOVA customers.`, alternates: { canonical: `/policies/${encodeURIComponent(slug)}` } };
 }
 
 export default async function PolicyPage({ params }) {

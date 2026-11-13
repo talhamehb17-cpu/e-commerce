@@ -17,6 +17,7 @@ export function AdminTeam() {
   const [groups, setGroups] = useState([]);
   const [inviting, setInviting] = useState(null);
   const [me, setMe] = useState(null);
+  const [showInvitePassword, setShowInvitePassword] = useState(false);
 
   async function load() {
     const [t, p] = await Promise.all([
@@ -31,6 +32,7 @@ export function AdminTeam() {
   const isOwner = me?.role === 'owner';
 
   async function invite() {
+    if (!inviting.name.trim() || !inviting.email.trim() || inviting.password.length < 12) return toast('Enter a name, email, and a password of at least 12 characters.', 'error');
     const res = await fetch('/api/admin/team', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inviting),
     });
@@ -59,7 +61,7 @@ export function AdminTeam() {
     <div>
       <div className="page-head">
         <div><h1>Team & permissions</h1><p>Role-based access — every sensitive action is written to the audit log.</p></div>
-        {isOwner && <button className="btn btn-sm" onClick={() => setInviting({ name: '', email: '', password: '', role: 'staff', permissions: [] })}><Plus size={13} /> Add admin</button>}
+        {isOwner && <button className="btn btn-sm" onClick={() => { setShowInvitePassword(false); setInviting({ name: '', email: '', password: '', role: 'staff', permissions: [] }); }}><Plus size={13} /> Add admin</button>}
       </div>
 
       <div className="panel" style={{ padding: 0, overflow: 'hidden', marginBottom: 14 }}>
@@ -104,7 +106,7 @@ export function AdminTeam() {
           ))}
         </div>
         <p className="sub" style={{ fontSize: 11.5 }}>
-          Owners have <code>*</code> access. Managers and staff are scoped by these resource groups; viewers can read anything but never modify.
+          Owners have <code>*</code> access. Managers, staff, and viewers are restricted to their assigned read/write scopes.
         </p>
       </div>
 
@@ -119,7 +121,7 @@ export function AdminTeam() {
             <div style={{ padding: 20 }}>
               <div className="field"><label>Name</label><input className="input" value={inviting.name} onChange={(e) => setInviting({ ...inviting, name: e.target.value })} /></div>
               <div className="field"><label>Email</label><input className="input" type="email" value={inviting.email} onChange={(e) => setInviting({ ...inviting, email: e.target.value })} /></div>
-              <div className="field"><label>Temporary password</label><input className="input" type="text" value={inviting.password} onChange={(e) => setInviting({ ...inviting, password: e.target.value })} placeholder="at least 8 characters" /></div>
+              <div className="field"><label>Temporary password</label><div className="password-input-wrap"><input className="input" type={showInvitePassword ? 'text' : 'password'} minLength={12} autoComplete="new-password" value={inviting.password} onChange={(e) => setInviting({ ...inviting, password: e.target.value })} placeholder="at least 12 characters" /><button type="button" aria-label={showInvitePassword ? 'Hide password' : 'Show password'} aria-pressed={showInvitePassword} onClick={() => setShowInvitePassword((visible) => !visible)}>{showInvitePassword ? 'Hide' : 'Show'}</button></div></div>
               <div className="field">
                 <label>Role</label>
                 <select className="input" value={inviting.role} onChange={(e) => setInviting({ ...inviting, role: e.target.value })}>

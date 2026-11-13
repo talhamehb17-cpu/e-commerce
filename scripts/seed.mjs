@@ -2,6 +2,7 @@ import postgres from 'postgres';
 import { promises as fs } from 'node:fs';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const url = process.env.DATABASE_URL || 'postgres://postgres:postgres@127.0.0.1:55432/postgres';
 const sql = postgres(url, { max: 1, ssl: /localhost|127\.0\.0\.1/.test(url) ? false : 'require', onnotice: () => {} });
@@ -363,10 +364,13 @@ async function main() {
 
   // admin
   const { hashPassword } = await import('../src/lib/db.js');
-  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@novastore.com').toLowerCase();
-  const adminPass = process.env.ADMIN_PASSWORD || 'NovaStudio2026!';
   const hasAdmin = await sql`select 1 from admins limit 1`;
   if (!hasAdmin[0]) {
+    const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    const adminPass = process.env.ADMIN_PASSWORD;
+    if (!adminEmail || !adminPass || adminPass.length < 12) {
+      throw new Error('Initial admin setup requires ADMIN_EMAIL and an ADMIN_PASSWORD of at least 12 characters. No default admin credentials are created.');
+    }
     await sql`insert into admins (name, email, password_hash, role, permissions)
       values ('Store Owner', ${adminEmail}, ${hashPassword(adminPass)}, 'owner', ${sql.json(['*'])})`;
     console.log(`✔ admin created: ${adminEmail}`);
@@ -376,9 +380,16 @@ async function main() {
   const demoEmail = 'client@novastore.com';
   let cust = await sql`select id from customers where email = ${demoEmail} limit 1`;
   if (!cust[0]) {
+    // The sample-review author is intentionally not a demo login: no known or
+    // reusable password is ever assigned to seeded customer accounts.
+    const unguessablePassword = crypto.randomBytes(48).toString('base64url');
     const r = await sql`insert into customers (name, email, password_hash, email_verified, email_verified_at)
-      values ('Ayesha Malik', ${demoEmail}, ${hashPassword('ClientDemo2026!')}, true, now()) returning id`;
+      values ('Ayesha Malik', ${demoEmail}, ${hashPassword(unguessablePassword)}, true, now()) returning id`;
     cust = r;
+  } else {
+    // Older seed revisions assigned a published demo password; invalidate it.
+    const unguessablePassword = crypto.randomBytes(48).toString('base64url');
+    await sql`update customers set password_hash = ${hashPassword(unguessablePassword)} where id = ${cust[0].id}`;
   }
   const revCount = await sql`select count(*)::int n from reviews`;
   if (revCount[0].n === 0) {

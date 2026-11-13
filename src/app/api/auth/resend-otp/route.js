@@ -13,6 +13,7 @@ export async function POST(request) {
   if (!limited.ok) return fail('Please wait a minute before requesting another code.', 429);
   const { data, error } = await parse(request, schemas.forgot.merge(z.object({ purpose: z.enum(['verify_email', 'reset_password']).default('verify_email') })));
   if (error) return fail(error, 422);
+  if (process.env.NODE_ENV === 'production' && !emailConfigured()) return fail('Email verification is temporarily unavailable. Please contact support.', 503);
   const rows = await sql`select id, name from customers where email = ${data.email}`;
   if (!rows[0]) return ok({ sent: true });
   const store = await getSetting('store');
@@ -21,5 +22,5 @@ export async function POST(request) {
     const tpl = templates.otp({ name: rows[0].name, code, purpose: data.purpose, storeName: store.name });
     await sendMail({ to: data.email, subject: tpl.subject, html: tpl.html, template: 'otp', customerId: rows[0].id });
   }
-  return ok({ sent: true, devCode: emailConfigured() ? undefined : code });
+  return ok({ sent: true, devCode: process.env.NODE_ENV === 'production' || emailConfigured() ? undefined : code });
 }

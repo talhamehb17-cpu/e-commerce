@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from './toast';
 import { useStore } from './providers';
+import { Eye, EyeOff } from './icons';
 
 export function AuthArt({ title, subtitle }) {
   return (
@@ -26,20 +27,32 @@ export function LoginForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [needsVerify, setNeedsVerify] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setError('');
-    const res = await fetch('/api/auth/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) { setError(data.error || 'Could not sign in'); return; }
-    toast(`Welcome back, ${data.name.split(' ')[0]}`);
-    if (data.needsVerification) setNeedsVerify(true);
-    router.push(next);
-    router.refresh();
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Could not sign in'); return; }
+      const firstName = data.customer?.name?.split(' ')[0] || 'back';
+      toast(`Welcome ${firstName === 'back' ? 'back' : `back, ${firstName}`}`);
+      if (data.customer?.verified === false) setNeedsVerify(true);
+      let target = '/account';
+      try {
+        const parsed = new URL(next, window.location.origin);
+        if (parsed.origin === window.location.origin) target = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      } catch { /* fall back to the account page for malformed return URLs */ }
+      router.push(target);
+      router.refresh();
+    } catch {
+      setError('Network error — try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -52,7 +65,7 @@ export function LoginForm() {
       </div>
       <div className="field">
         <label htmlFor="password">Password</label>
-        <input id="password" type="password" required autoComplete="current-password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" />
+        <div className="password-input-wrap"><input id="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <label className="checkbox"><input type="checkbox" defaultChecked /> Remember me</label>
@@ -71,33 +84,61 @@ export function RegisterForm() {
   const [error, setError] = useState('');
   const [step, setStep] = useState('form'); // form → otp
   const [code, setCode] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setError('');
-    const res = await fetch('/api/auth/register', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) { setError(data.error || 'Could not create account'); return; }
-    toast('Account created — verify your email');
-    setStep('otp');
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Could not create account'); return; }
+      toast('Account created — verify your email');
+      setStep('otp');
+    } catch {
+      setError('Network error — try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendCode() {
+    setBusy(true); setError('');
+    try {
+      const res = await fetch('/api/auth/resend-otp', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, purpose: 'verify_email' }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Could not resend code'); return; }
+      toast('A new verification code has been sent');
+    } catch {
+      setError('Network error — try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function verify(e) {
     e.preventDefault();
     setBusy(true); setError('');
-    const res = await fetch('/api/auth/verify-email', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: form.email, code, purpose: 'verify_email' }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) { setError(data.error || 'Could not verify'); return; }
-    toast('Email verified');
-    router.push('/account');
-    router.refresh();
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, code, purpose: 'verify_email' }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Could not verify'); return; }
+      toast('Email verified');
+      router.push('/account');
+      router.refresh();
+    } catch {
+      setError('Network error — try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (step === 'otp') {
@@ -110,7 +151,7 @@ export function RegisterForm() {
           <input id="code" inputMode="numeric" maxLength={6} required className="input otp-input" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="000000" />
         </div>
         <button className="btn btn-block" disabled={busy || code.length !== 6}>{busy ? 'Verifying…' : 'Verify email'}</button>
-        <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 10 }} onClick={() => { setStep('form'); form.password && submit(new Event('submit')); }}>
+        <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 10 }} onClick={resendCode} disabled={busy}>
           Resend code
         </button>
         <p className="auth-alt"><Link href="/account">Skip for now</Link></p>
@@ -131,7 +172,7 @@ export function RegisterForm() {
       </div>
       <div className="field">
         <label htmlFor="rpassword">Password</label>
-        <input id="rpassword" type="password" required minLength={8} className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 8 characters" autoComplete="new-password" />
+        <div className="password-input-wrap"><input id="rpassword" type={showPassword ? 'text' : 'password'} required minLength={8} className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 8 characters" autoComplete="new-password" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
       </div>
       <label className="checkbox" style={{ marginBottom: 18 }}>
         <input type="checkbox" checked={form.marketing} onChange={(e) => setForm({ ...form, marketing: e.target.checked })} />
@@ -147,17 +188,26 @@ export function ForgotForm() {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
   async function submit(e) {
     e.preventDefault();
-    setBusy(true);
-    await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
-    setBusy(false);
-    setSent(true);
-    toast('If that account exists, a code is on its way');
+    setBusy(true); setError('');
+    try {
+      const res = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Could not send a reset code'); return; }
+      setSent(true);
+      toast('If that account exists, a code is on its way');
+    } catch {
+      setError('Network error — try again.');
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <form onSubmit={submit}>
+      {error && <div className="alert error">{error}</div>}
       {sent ? (
         <>
           <div className="alert ok">Check your inbox for a 6-digit reset code.</div>
@@ -184,6 +234,7 @@ export function ResetForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setError('');
@@ -217,7 +268,7 @@ export function ResetForm() {
       </div>
       <div className="field">
         <label htmlFor="rnp">New password</label>
-        <input id="rnp" type="password" required minLength={8} className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <div className="password-input-wrap"><input id="rnp" type={showPassword ? 'text' : 'password'} required minLength={8} className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
       </div>
       <button className="btn btn-block" disabled={busy}>{busy ? 'Updating…' : 'Reset password'}</button>
       <p className="auth-alt"><Link href="/forgot-password">Need a new code?</Link></p>

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -24,6 +24,9 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [currOpen, setCurrOpen] = useState(false);
+  const [currencyQuery, setCurrencyQuery] = useState('');
+  const currencyButtonRef = useRef(null);
+  const currencyMenuRef = useRef(null);
   const pathname = usePathname();
   const cartState = useCart(() => setCartOpen(true));
 
@@ -35,7 +38,20 @@ export function Header() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  useEffect(() => { setMenuOpen(false); setCurrOpen(false); }, [pathname]);
+  useEffect(() => { setMenuOpen(false); setCurrOpen(false); setCurrencyQuery(''); }, [pathname]);
+
+  useEffect(() => {
+    if (!currOpen) return;
+    const onPointerDown = (event) => {
+      if (!currencyMenuRef.current?.contains(event.target)) { setCurrOpen(false); setCurrencyQuery(''); }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') { setCurrOpen(false); setCurrencyQuery(''); currencyButtonRef.current?.focus(); }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => { document.removeEventListener('pointerdown', onPointerDown); document.removeEventListener('keydown', onKeyDown); };
+  }, [currOpen]);
 
   const announcements = [
     store.announcement,
@@ -70,21 +86,34 @@ export function Header() {
           <div className="header-actions">
             <button className="icon-btn" onClick={() => setSearchOpen(true)} aria-label="Search"><Search size={18} /></button>
             <div style={{ position: 'relative' }}>
-              <button className="icon-btn" onClick={() => setCurrOpen((o) => !o)} aria-label="Change currency">
+              <button ref={currencyButtonRef} className="icon-btn" onClick={() => setCurrOpen((o) => !o)} aria-label="Change currency" aria-expanded={currOpen} aria-controls="currency-options">
                 <span style={{ display: 'inline-flex', gap: 5, alignItems: 'center', fontSize: 11, fontWeight: 600, letterSpacing: '.04em' }}><CurrencyFlag code={currency} size={18} />{currency}</span>
               </button>
               {currOpen && (
-                <div style={{ position: 'absolute', right: 0, top: 46, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 6, minWidth: 170, boxShadow: 'var(--shadow)', zIndex: 70 }}>
+                <div ref={currencyMenuRef} id="currency-options" style={{ position: 'absolute', right: 0, top: 46, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 6, width: 'min(320px, calc(100vw - 24px))', boxShadow: 'var(--shadow)', zIndex: 70 }}>
                   <div className="eyebrow" style={{ padding: '8px 10px 4px', fontSize: 10 }}>Display currency</div>
-                  {currencies.map((c) => (
+                  <input
+                    aria-label="Search currencies"
+                    className="input"
+                    type="search"
+                    placeholder="Search by name or code"
+                    value={currencyQuery}
+                    onChange={(event) => setCurrencyQuery(event.target.value)}
+                    autoFocus
+                    style={{ padding: '8px 10px', fontSize: 12, margin: '4px 4px 8px', width: 'calc(100% - 8px)' }}
+                  />
+                  <div style={{ maxHeight: 'min(52vh, 360px)', overflowY: 'auto' }}>
+                  {currencies.filter((c) => `${c.code} ${c.name}`.toLowerCase().includes(currencyQuery.trim().toLowerCase())).map((c) => (
                     <button
                       key={c.code}
-                      onClick={() => { setCurrency(c.code); setCurrOpen(false); }}
+                      onClick={() => { setCurrency(c.code); setCurrOpen(false); setCurrencyQuery(''); }}
                       style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: 12.5, background: c.code === currency ? 'var(--surface2)' : 'none', fontWeight: c.code === currency ? 600 : 400 }}
                     >
-                      <CurrencyFlag code={c.code} size={19} /><span style={{ flex: 1, textAlign: 'left' }}>{c.code} — {c.name}</span><span className="muted">{c.symbol}</span>
+                      <CurrencyFlag code={c.code} size={19} /><span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.code} — {c.name}</span><span className="muted">{c.symbol}</span>
                     </button>
                   ))}
+                  {!currencies.some((c) => `${c.code} ${c.name}`.toLowerCase().includes(currencyQuery.trim().toLowerCase())) && <p className="muted" style={{ padding: '10px', fontSize: 12 }}>No matching currencies.</p>}
+                  </div>
                   <div className="muted" style={{ padding: '6px 10px', fontSize: 10.5, lineHeight: 1.4 }}>Prices convert for display; settlement is in PKR.</div>
                 </div>
               )}

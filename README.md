@@ -77,9 +77,9 @@ npm run db:seed                   # brand, 30 products, 7 categories, 14 section
 npm run dev                       # http://localhost:3000
 ```
 
-Sign in at `/admin` with the `ADMIN_EMAIL` / `ADMIN_PASSWORD` from your `.env.local`.
+The first admin is created only when `ADMIN_EMAIL` and `ADMIN_PASSWORD` are supplied to `npm run db:seed`; the password must be at least 12 characters. The app and seed script intentionally provide no default admin credentials. Keep these values in your private environment manager, never in Git. For an out-of-band owner bootstrap/reset, place `DATABASE_URL`, `ADMIN_EMAIL`, and a new 12+ character `ADMIN_PASSWORD` in an ignored, permission-restricted `.env.admin.local`, then run `npm run admin:password`; it creates the first owner only on an empty admin table or resets only the matching active owner and revokes all admin sessions. Remove that temporary file when done. Subsequent password changes are also available under **My account** after signing in.
 If SMTP is not configured the app still works — emails are logged with status `skipped` and
-OTP codes are returned in the API response during development only.
+OTP codes may be returned by the API in non-production development only; production verification and recovery fail closed when email delivery is not configured.
 
 ## Deploying to Vercel
 

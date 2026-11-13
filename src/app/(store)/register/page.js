@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentCustomer } from '@/lib/auth';
 import { AuthArt, RegisterForm } from '@/components/auth-forms';
 
-export const metadata = { title: 'Create account' };
+export const metadata = { title: 'Create account', robots: { index: false, follow: false } };
 
 export default async function RegisterPage() {
   const customer = await getCurrentCustomer();

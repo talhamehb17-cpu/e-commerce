@@ -14,6 +14,7 @@ export async function generateMetadata({ params }) {
   return {
     title: product.name,
     description: product.subtitle || product.description?.slice(0, 155),
+    alternates: { canonical: `/products/${encodeURIComponent(slug)}` },
     openGraph: { images: [product.image], title: product.name, description: product.subtitle || '' },
   };
 }
@@ -28,6 +29,15 @@ export default async function ProductPage({ params }) {
     getCurrencies(),
     listProducts({ category: product.categorySlug, limit: 5 }),
   ]);
+
+  const productSchema = {
+    '@context': 'https://schema.org', '@type': 'Product', name: product.name,
+    description: product.subtitle || product.description || undefined,
+    image: product.gallery?.length ? product.gallery.map((image) => image.url) : [product.image].filter(Boolean),
+    sku: product.sku || undefined, brand: product.brandName ? { '@type': 'Brand', name: product.brandName } : undefined,
+    offers: { '@type': 'Offer', priceCurrency: 'PKR', price: (Number(product.price) / 100).toFixed(2), availability: Number(product.stock) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', url: `${(process.env.NEXT_PUBLIC_SITE_URL || `https://${process.env.VERCEL_URL || 'nova-commerce-eight.vercel.app'}`).replace(/\/$/, '')}/products/${encodeURIComponent(slug)}` },
+    ...(Number(product.ratingCount) > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(product.rating), reviewCount: Number(product.ratingCount) } } : {}),
+  };
 
   let savedId = null;
   let myReview = null;
@@ -44,7 +54,9 @@ export default async function ProductPage({ params }) {
   }
 
   return (
-    <ProductDetail
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema).replace(/</g, '\\u003c') }} />
+      <ProductDetail
       product={product}
       related={related.products.filter((p) => p.id !== product.id).slice(0, 4)}
       saved={Boolean(savedId)}
@@ -53,5 +65,6 @@ export default async function ProductPage({ params }) {
       verifiedPurchase={canReview}
       currencyDefault={customer?.currency || currencies.find((c) => c.isDefault)?.code || 'PKR'}
     />
+    </>
   );
 }

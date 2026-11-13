@@ -5,6 +5,12 @@ import { ShopGrid } from '@/components/shop';
 
 export const dynamic = 'force-dynamic';
 
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const brand = (await getBrands()).find((item) => item.slug === slug);
+  return { title: brand?.name || 'Brand', description: brand?.description || `Shop ${brand?.name || 'NOVA'} products.`, alternates: { canonical: `/brands/${encodeURIComponent(slug)}` } };
+}
+
 export default async function BrandPage({ params }) {
   const { slug } = await params;
   const brands = await getBrands();

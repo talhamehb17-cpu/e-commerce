@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { getCollections, getCategories } from '@/lib/catalog';
 import { Breadcrumb } from '@/components/ui';
 
-export const metadata = { title: 'Collections & departments' };
+export const metadata = { title: 'Collections & departments', description: 'Explore NOVA collections and departments, curated for everyday living.', alternates: { canonical: '/collections' } };
 export const revalidate = 60;
 
 export default async function CollectionsIndex() {

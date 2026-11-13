@@ -17,7 +17,7 @@ const PERMISSION_GROUPS = [
 const schema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(8).max(120),
+  password: z.string().min(12).max(120),
   role: z.enum(['owner', 'manager', 'staff', 'viewer']).default('staff'),
   permissions: z.array(z.string().max(40)).max(30).default([]),
 });

@@ -5,7 +5,7 @@ import { ShopBrowser } from '@/components/shop-browser';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Shop all products' };
+export const metadata = { title: 'Shop all products', description: 'Browse every NOVA product across fashion, electronics, home and more.', alternates: { canonical: '/shop' } };
 
 export default async function ShopPage({ searchParams }) {
   const sp = await searchParams;

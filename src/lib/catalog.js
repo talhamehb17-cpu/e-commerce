@@ -54,6 +54,7 @@ const PRODUCT_COLUMNS = sql`
   p.id, p.slug, p.name, p.subtitle, p.price, p.compare_at_price, p.stock, p.badge,
   p.is_featured, p.rating_avg, p.rating_count, p.sold_count, p.created_at, p.material,
   c.slug as category_slug, c.name as category_name,
+  b.slug as brand_slug, b.name as brand_name,
   (select url from product_images pi where pi.product_id = p.id order by position limit 1) as image,
   (select url from product_images pi where pi.product_id = p.id order by position offset 1 limit 1) as image2,
   (select count(*)::int from product_variants v where v.product_id = p.id) as variant_count
@@ -103,6 +104,7 @@ export async function listProducts({
   const rows = await sql`
     select ${PRODUCT_COLUMNS} from products p
     left join categories c on c.id = p.category_id
+    left join brands b on b.id = p.brand_id
     ${filter}
     order by ${order}
     limit ${limit} offset ${offset}
@@ -130,6 +132,8 @@ export function shapeProduct(r) {
     material: r.material,
     categorySlug: r.category_slug,
     categoryName: r.category_name,
+    brandName: r.brand_name || null,
+    brandSlug: r.brand_slug || null,
     image: resolveImage(r.image, r.category_slug, 0),
     image2: r.image2 ? resolveImage(r.image2, r.category_slug, 1) : null,
     variantCount: r.variant_count ?? 0,
@@ -139,8 +143,8 @@ export function shapeProduct(r) {
 
 export async function getProductBySlug(slug) {
   const rows = await sql`
-    select p.*, c.slug as category_slug, c.name as category_name
-    from products p left join categories c on c.id = p.category_id
+    select p.*, c.slug as category_slug, c.name as category_name, b.slug as brand_slug, b.name as brand_name
+    from products p left join categories c on c.id = p.category_id left join brands b on b.id = p.brand_id
     where p.slug = ${slug} limit 1
   `;
   const p = rows[0];
@@ -148,7 +152,7 @@ export async function getProductBySlug(slug) {
   const [images, variants, related, reviews] = await Promise.all([
     sql`select id, url, alt, position from product_images where product_id = ${p.id} order by position`,
     sql`select id, name, option_name, price_delta, sku, stock, position from product_variants where product_id = ${p.id} order by position`,
-    sql`select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id
+    sql`select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id left join brands b on b.id = p.brand_id
         where p.is_active and p.id <> ${p.id} and (p.category_id = ${p.category_id} or p.is_featured)
         order by (p.category_id = ${p.category_id}) desc, p.sold_count desc limit 4`,
     getProductReviews(p.id, 6),
@@ -253,6 +257,7 @@ export async function getCollectionProducts(collectionId, limit = 24) {
     select ${PRODUCT_COLUMNS} from products p
     join collection_products cp on cp.product_id = p.id
     left join categories c on c.id = p.category_id
+    left join brands b on b.id = p.brand_id
     where cp.collection_id = ${collectionId} and p.is_active
     order by cp.position, p.created_at desc limit ${limit}`;
   return rows.map(shapeProduct);
@@ -280,7 +285,7 @@ export async function searchSuggestions(q, limit = 6) {
   if (!q || q.trim().length < 2) return { products: [], categories: [] };
   const term = `%${q.trim()}%`;
   const [products, categories] = await Promise.all([
-    sql`select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id
+    sql`select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id left join brands b on b.id = p.brand_id
         where p.is_active and (p.name ilike ${term} or p.subtitle ilike ${term})
         order by p.is_featured desc limit ${limit}`,
     sql`select slug, name from categories where name ilike ${term} limit 4`,
@@ -291,7 +296,7 @@ export async function searchSuggestions(q, limit = 6) {
 export async function getProductsByIds(ids) {
   if (!ids?.length) return [];
   const rows = await sql`
-    select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id
+    select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id left join brands b on b.id = p.brand_id
     where p.id = any(${ids}::uuid[]) and p.is_active
   `;
   return rows.map(shapeProduct);
@@ -300,7 +305,7 @@ export async function getProductsByIds(ids) {
 export async function getProductsBySlugs(slugs) {
   if (!slugs?.length) return [];
   const rows = await sql`
-    select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id
+    select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id left join brands b on b.id = p.brand_id
     where p.slug = any(${slugs}::text[]) and p.is_active
   `;
   return rows.map(shapeProduct);

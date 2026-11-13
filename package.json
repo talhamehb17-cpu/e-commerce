@@ -12,7 +12,8 @@
     "postinstall": "echo skip",
     "build:local": "DEPLOY_DB=0 next build",
     "db:local": "node scripts/_pgl.mjs",
-    "db:sync": "node --env-file=.env.local scripts/sync-settings.mjs"
+    "db:sync": "node --env-file=.env.local scripts/sync-settings.mjs",
+    "admin:password": "node --env-file=.env.admin.local scripts/set-admin-password.mjs"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20",

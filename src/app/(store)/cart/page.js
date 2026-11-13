@@ -5,7 +5,7 @@ import { Breadcrumb } from '@/components/ui';
 import { CartView } from '@/components/cart-view';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Your bag' };
+export const metadata = { title: 'Your bag', robots: { index: false, follow: false } };
 
 export default async function CartPage() {
   const customer = await getCurrentCustomer();

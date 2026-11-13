@@ -7,8 +7,10 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const title = slug.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-  return { title: `${title} · NOVA` };
+  const [collections, categories] = await Promise.all([getCollections(), getCategories()]);
+  const entry = collections.find((item) => item.slug === slug) || categories.find((item) => item.slug === slug);
+  const title = entry?.name || slug.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  return { title, description: entry?.description || `Shop the ${title} edit at NOVA.`, alternates: { canonical: `/collections/${encodeURIComponent(slug)}` } };
 }
 
 export default async function CollectionPage({ params, searchParams }) {

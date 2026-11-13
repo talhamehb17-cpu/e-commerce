@@ -37,10 +37,20 @@ const NAV = [
   ]},
 ];
 
-export function AdminShell({ admin, badges = {}, children }) {
+export function AdminShell({ admin, adminAccess = {}, badges = {}, children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const accessFor = (href) => {
+    if (href === '/admin') return true;
+    if (href.startsWith('/admin/orders')) return adminAccess.orders;
+    if (href.startsWith('/admin/customers')) return adminAccess.customers;
+    if (href.startsWith('/admin/products') || href.startsWith('/admin/inventory') || href.startsWith('/admin/categories') || href.startsWith('/admin/brands') || href.startsWith('/admin/collections')) return adminAccess.products;
+    if (href.startsWith('/admin/reviews')) return adminAccess.reviews;
+    if (href.startsWith('/admin/content') || href.startsWith('/admin/themes')) return adminAccess.content;
+    if (href.startsWith('/admin/discounts') || href.startsWith('/admin/currencies') || href.startsWith('/admin/settings') || href.startsWith('/admin/team')) return adminAccess.settings;
+    return true;
+  };
 
   async function logout() {
     await fetch('/api/admin/logout', { method: 'POST' });
@@ -57,7 +67,7 @@ export function AdminShell({ admin, badges = {}, children }) {
           <span className="admin-tag">Admin</span>
         </div>
         <nav className="admin-nav">
-          {NAV.map((g) => (
+          {NAV.map((g) => ({ ...g, items: g.items.filter((item) => accessFor(item.href)) })).filter((g) => g.items.length > 0).map((g) => (
             <div key={g.group} className="admin-nav-group">
               <div className="admin-nav-label">{g.group}</div>
               {g.items.map((it) => {
