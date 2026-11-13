@@ -1,5 +1,6 @@
 import postgres from 'postgres';
 import { promises as fs } from 'node:fs';
+import fsSync from 'node:fs';
 import path from 'node:path';
 
 const url = process.env.DATABASE_URL || 'postgres://postgres:postgres@127.0.0.1:55432/postgres';
@@ -11,9 +12,9 @@ const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|
    Image keys map to the photography shipped in /public/images.
 ------------------------------------------------------------------ */
 const CATEGORIES = [
-  ['electronics', 'Electronics', 'Audio, wearables and everyday tech.', 'electronics', true],
-  ['fashion', 'Fashion', 'Outerwear, knitwear and wardrobe staples.', 'fashion', true],
-  ['shoes', 'Shoes', 'Sneakers, boots and refined everyday footwear.', 'shoes', true],
+  ['electronics', 'Electronics', 'Audio, wearables and everyday tech.', 'electronics-headphones-1', true],
+  ['fashion', 'Fashion', 'Outerwear, knitwear and wardrobe staples.', 'fashion-coat-1', true],
+  ['shoes', 'Shoes', 'Sneakers, boots and refined everyday footwear.', 'shoes-sneakers-1', true],
   ['home', 'Home & Living', 'Lighting, ceramics and textiles for slow living.', 'home-lamp-1', true],
   ['beauty', 'Beauty', 'Skincare and self-care, formulated simply.', 'beauty-serum-1', true],
   ['sports', 'Sports & Fitness', 'Training gear built for daily movement.', 'sports-yoga-mat-1', true],
@@ -121,7 +122,7 @@ async function upsertCategory(slug, name, description, imageKey, isFeatured, pos
     on conflict (slug) do update set
       name = excluded.name,
       description = excluded.description,
-      image_url = coalesce(nullif(categories.image_url, ''), excluded.image_url),
+      image_url = excluded.image_url,
       position = excluded.position
     returning id`;
   return r[0].id;
@@ -226,9 +227,10 @@ async function main() {
       id = r[0].id;
     }
 
-    const imgCount = await sql`select count(*)::int n from product_images where product_id = ${id}`;
-    const stale = await sql`select count(*)::int n from product_images where product_id = ${id} and url not like '/images/products/%'`;
-    if (imgCount[0].n === 0 || stale[0].n > 0) {
+    const mediaRows = await sql`select url from product_images where product_id = ${id} order by position`;
+    const staleMedia = mediaRows.some(({ url }) => url?.startsWith('/images/')
+      && !fsSync.existsSync(path.resolve('public', url.replace(/^\/+/, ''))));
+    if (mediaRows.length === 0 || staleMedia) {
       await sql`delete from product_images where product_id = ${id}`;
       const gallery = [primary, HOVER_IMAGES[cat] || '/images/hero/hero-main.jpg'];
       const unique = [...new Set(gallery)];
@@ -264,7 +266,7 @@ async function main() {
     const c = await sql`
       insert into collections (slug, name, description, image_url, is_featured, position)
       values (${slug}, ${name}, ${desc}, ${'/images/hero/' + (kind === 'gift' ? 'hero-side' : 'hero-main') + '.jpg'}, ${featured}, ${i})
-      on conflict (slug) do update set name=excluded.name, description=excluded.description, position=excluded.position
+      on conflict (slug) do update set name=excluded.name, description=excluded.description, image_url=excluded.image_url, position=excluded.position
       returning id`;
     const cid = c[0].id;
     const cnt = await sql`select count(*)::int n from collection_products where collection_id = ${cid}`;
