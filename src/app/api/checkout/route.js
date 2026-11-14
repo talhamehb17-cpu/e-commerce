@@ -41,20 +41,27 @@ export async function POST(request) {
 
   const rate = Number(cur.rate_to_base);
   const displayTotal = Math.round((recalculated.total / 100 / rate) * 10 ** (cur.decimals ?? 2) * 100);
+  const eventDiscounts = new Map();
+  for (const item of items) if (item.event_id) eventDiscounts.set(item.event_id, (eventDiscounts.get(item.event_id)||0) + Number(item.event_discount||0) * Number(item.qty));
+  const appliedEventIds=[...eventDiscounts.keys()];
 
-  // Re-validate everything inside a transaction so stock and coupons stay consistent.
+  // Re-validate everything inside a transaction so stock, event windows and coupons stay consistent.
   const result = await sql.begin(async (tx) => {
+    if(appliedEventIds.length){
+      const stillActive=await tx`select id from promotion_events where id=any(${appliedEventIds}::uuid[]) and is_enabled and not is_paused and starts_at<=now() and ends_at>now() for share`;
+      if(stillActive.length!==appliedEventIds.length)throw new Error('PROMOTION_WINDOW_CLOSED');
+    }
     let orderRow;
     for (let attempt = 0; attempt < 3 && !orderRow; attempt++) {
       try {
         const rows = await tx`
           insert into orders (order_number, customer_id, email, phone, status, payment_method, currency, fx_rate,
             subtotal, discount_total, shipping_total, tax_total, grand_total, display_total, coupon_code,
-            shipping_address, billing_address, notes)
+            promotion_event_id, promotion_discount_total, coupon_discount_total, shipping_address, billing_address, notes)
           values (${generateOrderNumber()}, ${customer?.id || null}, ${data.email}, ${data.phone}, 'pending',
             ${data.paymentMethod}, ${cur.code}, ${rate}, ${recalculated.subtotal}, ${recalculated.discount},
             ${recalculated.shipping}, ${recalculated.tax}, ${recalculated.total}, ${displayTotal},
-            ${recalculated.coupon?.code || null},
+            ${recalculated.coupon?.code || null}, ${appliedEventIds[0]||null}, ${recalculated.eventDiscount}, ${recalculated.couponDiscount},
             ${tx.json({ full_name: data.fullName, phone: data.phone, line1: data.line1, line2: data.line2 || '', city: data.city, state: data.state || '', postal_code: data.postalCode || '', country: data.country })},
             ${tx.json({ full_name: data.fullName, line1: data.line1, city: data.city, country: data.country })},
             ${data.notes || null})
@@ -85,8 +92,14 @@ export async function POST(request) {
 
     await tx`insert into order_events (order_id, status, note, actor) values (${orderRow.id}, 'pending', 'Order placed', 'customer')`;
 
+    for(const [eventId,discountTotal] of eventDiscounts){
+      await tx`insert into order_promotion_events(order_id,event_id,discount_total) values(${orderRow.id},${eventId},${discountTotal})`;
+      await tx`insert into promotion_event_activity(event_id,activity_type,visitor_hash,order_id) values(${eventId},'order',${visitorHash(request)},${orderRow.id})`;
+    }
+
     if (recalculated.coupon?.code) {
-      await tx`update coupons set used_count = used_count + 1 where upper(code) = upper(${recalculated.coupon.code})`;
+      const used=await tx`update coupons set used_count = used_count + 1 where upper(code) = upper(${recalculated.coupon.code}) and is_active and (starts_at is null or starts_at<=now()) and (ends_at is null or ends_at>=now()) and (usage_limit is null or used_count<usage_limit) returning id`;
+      if(!used[0])throw new Error('COUPON_WINDOW_CLOSED');
     }
 
     if (data.saveAddress && customer) {
@@ -100,11 +113,13 @@ export async function POST(request) {
     await tx`update carts set coupon_code = null where id = ${cart.id}`;
     return orderRow;
   }).catch((e) => {
-    if (String(e.message).startsWith('OUT_OF_STOCK:')) return { error: e.message.split(':')[1] };
+    if (String(e.message).startsWith('OUT_OF_STOCK:')) return { error: `${e.message.split(':')[1]} just sold out. Please adjust your bag.` };
+    if(e.message==='PROMOTION_WINDOW_CLOSED')return {error:'An event offer just expired. Refresh your bag to see current prices.'};
+    if(e.message==='COUPON_WINDOW_CLOSED')return {error:'That coupon is no longer available. Refresh your bag and try again.'};
     throw e;
   });
 
-  if (result?.error) return fail(`${result.error} just sold out. Please adjust your bag.`, 409);
+  if (result?.error) return fail(result.error, 409);
   await recordEvent('purchase', visitorHash(request), { orderId: result.id });
 
   // Emails are best-effort and never block the order.

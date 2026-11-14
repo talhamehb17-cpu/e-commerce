@@ -218,7 +218,8 @@ export function CheckoutForm({ items, totals, customer, addresses, payments, cur
           <button className="btn btn-outline btn-sm">Apply</button>
         </form>
         <div className="summary-row"><span>Subtotal</span><span>{money(localTotals.subtotal)}</span></div>
-        {localTotals.discount > 0 && <div className="summary-row"><span>Discount</span><span style={{ color: 'var(--accent)' }}>−{money(localTotals.discount)}</span></div>}
+        {localTotals.eventDiscount > 0 && <div className="summary-row"><span>Event offer</span><span style={{ color: 'var(--accent)' }}>−{money(localTotals.eventDiscount)}</span></div>}
+        {localTotals.couponDiscount > 0 && <div className="summary-row"><span>Coupon {localTotals.coupon ? `(${localTotals.coupon.code})` : ''}</span><span style={{ color: 'var(--accent)' }}>−{money(localTotals.couponDiscount)}</span></div>}
         <div className="summary-row"><span>Delivery</span><span>{localTotals.shipping ? money(localTotals.shipping) : 'Free'}</span></div>
         <div className="summary-row total"><span>Total</span><span>{money(localTotals.total)}</span></div>
         <p className="muted" style={{ fontSize: 10.5, marginTop: 10, lineHeight: 1.5 }}>

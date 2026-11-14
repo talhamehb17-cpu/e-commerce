@@ -7,7 +7,7 @@ import { toast } from '../toast';
 import {
   LayoutDashboard, Boxes, Package, Tag, Users, MessageSquare, Ticket, ImageIcon,
   Palette, Coins, Settings, ClipboardList, User as UserIcon, LogOut, Menu, X, Store, ExternalLink,
-  BarChart3, Layers, Grid2x2, ShieldCheck, Mail,
+  BarChart3, Layers, Grid2x2, ShieldCheck, Mail, Calendar,
 } from '../icons';
 
 const NAV = [
@@ -26,6 +26,7 @@ const NAV = [
     { href: '/admin/reviews', label: 'Reviews', icon: MessageSquare, badgeKey: 'reviews' },
   ]},
   { group: 'Marketing', items: [
+    { href: '/admin/events', label: 'Events & Promotions', icon: Calendar },
     { href: '/admin/discounts', label: 'Discounts', icon: Ticket },
     { href: '/admin/content', label: 'Homepage', icon: ImageIcon },
     { href: '/admin/themes', label: 'Appearance', icon: Palette },
@@ -50,7 +51,7 @@ export function AdminShell({ admin, adminAccess = {}, badges = {}, children }) {
     if (href.startsWith('/admin/customers')) return adminAccess.customers;
     if (href.startsWith('/admin/products') || href.startsWith('/admin/inventory') || href.startsWith('/admin/categories') || href.startsWith('/admin/brands') || href.startsWith('/admin/collections')) return adminAccess.products;
     if (href.startsWith('/admin/reviews')) return adminAccess.reviews;
-    if (href.startsWith('/admin/content') || href.startsWith('/admin/themes')) return adminAccess.content;
+    if (href.startsWith('/admin/content') || href.startsWith('/admin/themes') || href.startsWith('/admin/events')) return adminAccess.content;
     if (href.startsWith('/admin/email')) return adminAccess.ownerEmail;
     if (href.startsWith('/admin/discounts') || href.startsWith('/admin/currencies') || href.startsWith('/admin/settings') || href.startsWith('/admin/team')) return adminAccess.settings;
     return true;

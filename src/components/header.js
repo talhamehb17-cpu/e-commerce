@@ -24,6 +24,7 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [currOpen, setCurrOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState('');
+  const [eventPromotions, setEventPromotions] = useState(store.activePromotions || []);
   const currencyButtonRef = useRef(null);
   const currencyMenuRef = useRef(null);
   const pathname = usePathname();
@@ -38,6 +39,14 @@ export function Header() {
   }, []);
 
   useEffect(() => { setMenuOpen(false); setCurrOpen(false); setCurrencyQuery(''); }, [pathname]);
+
+  useEffect(() => {
+    let active=true;
+    const refresh=()=>fetch('/api/events/active',{cache:'no-store'}).then(res=>res.ok?res.json():null).then(data=>{if(active&&data?.events)setEventPromotions(data.events)}).catch(()=>{});
+    const timer=window.setInterval(refresh,20_000);
+    window.addEventListener('focus',refresh);
+    return()=>{active=false;window.clearInterval(timer);window.removeEventListener('focus',refresh)};
+  },[]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -66,19 +75,21 @@ export function Header() {
     return () => { document.removeEventListener('pointerdown', onPointerDown); document.removeEventListener('keydown', onKeyDown); };
   }, [currOpen]);
 
-  const announcements = [
-    store.announcement,
-    'Cash on delivery · 30-day returns · Worldwide shipping',
-    'New season — the wardrobe edit is live',
-  ].filter(Boolean);
+  const liveEvents = eventPromotions.filter((event) => event.announcement_enabled);
+  const announcementEvent = liveEvents[0] || null;
+  const announcements = liveEvents.length
+    ? liveEvents.map((event) => ({ text:event.tagline || `${event.title} — ${event.discount_percent}% off · Shop now`, href:event.cta_href || '/shop', event:true }))
+    : [store.announcement, 'Cash on delivery · 30-day returns · Worldwide shipping', 'New season — the wardrobe edit is live'].filter(Boolean).map((text)=>({text,href:null,event:false}));
+  const announcementStyle = announcementEvent ? { background:announcementEvent.announcement_color, color:announcementEvent.announcement_text_color, '--event-marquee-speed':`${announcementEvent.announcement_speed}s` } : undefined;
 
   return (
     <>
-      <div className="announce">
+      <div className="announce" style={announcementStyle}>
         <div className="announce-inner">
-          <div className="announce-track">
-            {[...announcements, ...announcements].map((a, i) => (
-              <span key={i}>{a} <span style={{ opacity: 0.4, marginLeft: 28 }}>✦</span></span>
+          <div className={`announce-track${announcementEvent?' announce-track-event':''}`} style={announcementEvent?{animationDuration:`${announcementEvent.announcement_speed}s`}:undefined}>
+            {[...announcements, ...announcements].map((item, i) => (
+              item.event ? <Link key={`${item.text}-${i}`} href={item.href} className="announce-event-link">{item.text} <span style={{ opacity: 0.55, marginLeft: 28 }}>✦</span></Link>
+                : <span key={`${item.text}-${i}`}>{item.text} <span style={{ opacity: 0.4, marginLeft: 28 }}>✦</span></span>
             ))}
           </div>
         </div>

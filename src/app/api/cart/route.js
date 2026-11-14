@@ -3,6 +3,7 @@ import { fail, json, ok, parse, schemas } from '@/lib/api';
 import { getCurrentCustomer, ensureCart, getCart } from '@/lib/auth';
 import { loadCart } from '@/lib/cart';
 import { recordEvent, visitorHash } from '@/lib/analytics-events';
+import { recordPromotionActivity } from '@/lib/promotions';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -53,6 +54,8 @@ export async function POST(request) {
   invalidate('');
   await recordEvent('add_to_cart', visitorHash(request), { productId: data.productId });
   const fresh = await loadCart(customer?.id || null);
+  const promotedItem=fresh.items.find((item)=>item.product_id===data.productId&&item.variant_id===(data.variantId||null));
+  if(promotedItem?.event_id)await recordPromotionActivity({eventId:promotedItem.event_id,activityType:'add_to_cart',visitorHash:visitorHash(request),productId:data.productId}).catch(()=>{});
   return ok({ items: fresh.items, totals: fresh.totals, itemCount: fresh.totals.itemCount });
 }
 

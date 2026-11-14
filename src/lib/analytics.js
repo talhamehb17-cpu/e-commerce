@@ -4,7 +4,7 @@ import { getSetting } from '@/lib/settings';
 const DAY_MS = 86_400_000;
 const VALID_BUCKETS = new Set(['hour', 'day', 'week', 'month', 'quarter', 'year']);
 const INTERVALS = { hour: '1 hour', day: '1 day', week: '1 week', month: '1 month', quarter: '3 months', year: '1 year' };
-const dateOnly = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+const dateOnly = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
 const moveDate = (date, offset) => new Date(Date.parse(`${date}T00:00:00Z`) + offset * DAY_MS).toISOString().slice(0, 10);
 const partsInZone = (date, zone) => Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
   timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -81,6 +81,13 @@ const filteredCte = (range, where) => sql`
     from orders o where o.placed_at >= ${range.start}::timestamptz and o.placed_at < ${range.end}::timestamptz ${where}
   )
 `;
+const deliveredCte = (range, where) => sql`
+  with delivered as (
+    select o.id,o.customer_id,o.status,o.payment_status,o.payment_method,o.grand_total,o.discount_total,o.coupon_code,o.placed_at,o.delivered_at,o.currency,o.order_number
+    from orders o where o.delivered_at >= ${range.start}::timestamptz and o.delivered_at < ${range.end}::timestamptz
+      and o.status='delivered' and o.payment_status='paid' ${where}
+  )
+`;
 
 /**
  * Date boundaries are local calendar dates in the configured IANA store timezone;
@@ -119,15 +126,17 @@ export async function getAnalytics(params) {
   const [summary, seriesRows, statusRows, paymentRows, productRows, categoryRows, campaignRows, customerRows, customerPurchaseTypes, trafficRows, events, eventConversion, recentTraffic, inventoryRows, recentOrders, couponRows, comparison, filterOptions, hourRows, weekdayRows, liveSessions, productActivity] = await Promise.all([
     sql`${filteredCte(range, where)}
       select count(*)::int orders,
-        count(*) filter(where payment_status='paid' and status not in ('cancelled','refunded'))::int paid_orders,
-        coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue,
-        coalesce(sum(grand_total) filter(where payment_status<>'paid' and status not in ('cancelled','refunded')),0)::bigint outstanding,
-        coalesce(sum(discount_total),0)::bigint discounts,
+        count(*) filter(where payment_status='paid' and status not in ('cancelled','refunded','returned'))::int paid_orders,
+        coalesce(sum(grand_total) filter(where status<>'cancelled'),0)::bigint gross_order_value,
+        coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded','returned')),0)::bigint paid_order_value,
+        (select coalesce(sum(o.grand_total),0)::bigint from orders o where o.delivered_at >= ${range.start}::timestamptz and o.delivered_at < ${range.end}::timestamptz and o.status='delivered' and o.payment_status='paid' ${where})::bigint revenue,
+        coalesce(sum(grand_total) filter(where payment_status<>'paid' and status<>'cancelled'),0)::bigint outstanding,
+        coalesce(sum(discount_total) filter(where status<>'cancelled'),0)::bigint discounts,
         count(*) filter(where status='delivered')::int delivered,
         count(*) filter(where status='cancelled')::int cancelled,
         count(*) filter(where status='refunded')::int refunded,
         count(*) filter(where status='returned')::int returned,
-        coalesce(avg(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint aov,
+        (select coalesce(avg(o.grand_total),0)::bigint from orders o where o.delivered_at >= ${range.start}::timestamptz and o.delivered_at < ${range.end}::timestamptz and o.status='delivered' and o.payment_status='paid' ${where})::bigint aov,
         count(distinct customer_id) filter(where customer_id is not null and status not in ('cancelled','refunded'))::int purchasing_customers,
         count(*) filter(where delivered_at is not null)::int with_delivery_time,
         coalesce(avg(extract(epoch from (delivered_at-placed_at))) filter(where delivered_at is not null and delivered_at>=placed_at),0)::numeric avg_delivery_seconds
@@ -139,9 +148,10 @@ export async function getAnalytics(params) {
       ), aggregated as (
         select date_trunc(${bucket}, placed_at at time zone ${timezone}) local_bucket,
           count(*)::int orders,
-          count(*) filter(where payment_status='paid' and status not in ('cancelled','refunded'))::int paid_orders,
-          coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue,
-          coalesce(sum(discount_total),0)::bigint discounts,
+          count(*) filter(where payment_status='paid' and status not in ('cancelled','refunded','returned'))::int paid_orders,
+          coalesce(sum(grand_total) filter(where status<>'cancelled'),0)::bigint gross_order_value,
+          coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded','returned')),0)::bigint paid_order_value,
+          coalesce(sum(discount_total) filter(where status<>'cancelled'),0)::bigint discounts,
           coalesce(avg(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint average_order_value,
           count(*) filter(where status='pending')::int pending_orders,
           count(*) filter(where status='confirmed')::int confirmed_orders,
@@ -157,6 +167,12 @@ export async function getAnalytics(params) {
             and (${product}::text is null or oi.product_id::text=${product})
             and (${category}::text is null or p.category_id::text=${category}))) filter(where status not in ('cancelled','refunded')),0)::bigint units
         from filtered group by 1
+      ), delivery_agg as (
+        select date_trunc(${bucket},o.delivered_at at time zone ${timezone}) local_bucket,
+          coalesce(sum(o.grand_total),0)::bigint revenue,coalesce(sum(o.discount_total),0)::bigint discounts,
+          coalesce(avg(o.grand_total),0)::bigint average_order_value
+        from orders o where o.delivered_at >= ${range.start}::timestamptz and o.delivered_at < ${range.end}::timestamptz
+          and o.status='delivered' and o.payment_status='paid' ${where} group by 1
       ), visitors as (
         select date_trunc(${bucket}, created_at at time zone ${timezone}) local_bucket,
           count(*)::int page_views, count(distinct visitor_hash)::int visitor_days
@@ -188,37 +204,38 @@ export async function getAnalytics(params) {
         coalesce(a.processing_orders,0)::int processing_orders,coalesce(a.packed_orders,0)::int packed_orders,
         coalesce(a.shipped_orders,0)::int shipped_orders,coalesce(a.out_for_delivery_orders,0)::int out_for_delivery_orders,
         coalesce(a.delivered_orders,0)::int delivered_orders,coalesce(a.cancelled_orders,0)::int cancelled_orders,coalesce(a.returned_orders,0)::int returned_orders,
-        coalesce(a.average_order_value,0)::bigint average_order_value,
-        coalesce(a.revenue,0)::bigint revenue, coalesce(a.discounts,0)::bigint discounts,
+        coalesce(d.average_order_value,0)::bigint average_order_value,
+        coalesce(d.revenue,0)::bigint revenue,coalesce(a.gross_order_value,0)::bigint gross_order_value,coalesce(a.paid_order_value,0)::bigint paid_order_value,
+        coalesce(d.discounts,0)::bigint discounts,
         coalesce(a.units,0)::bigint units, coalesce(v.page_views,0)::int page_views,
         coalesce(v.visitor_days,0)::int visitor_days, coalesce(c.new_customers,0)::int new_customers,
         coalesce(bt.new_purchasers,0)::int new_purchasers, coalesce(bt.returning_purchasers,0)::int returning_purchasers,
         coalesce(aa.customer_sessions,0)::int customer_sessions,coalesce(aa.admin_sessions,0)::int admin_sessions,
         coalesce(sa.stock_delta,0)::int stock_delta
-      from buckets b left join aggregated a using(local_bucket) left join visitors v using(local_bucket)
+      from buckets b left join aggregated a using(local_bucket) left join delivery_agg d using(local_bucket) left join visitors v using(local_bucket)
         left join signups c using(local_bucket) left join buyer_types bt using(local_bucket)
         left join auth_activity aa using(local_bucket) left join stock_activity sa using(local_bucket)
       order by b.local_bucket`,
     sql`${filteredCte(range, where)} select status, count(*)::int orders, coalesce(sum(grand_total),0)::bigint value from filtered group by status order by status`,
     sql`${filteredCte(range, where)} select payment_method as name, count(*)::int orders,
-      coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue,
-      coalesce(sum(grand_total) filter(where payment_status<>'paid' and status not in ('cancelled','refunded')),0)::bigint outstanding
+      coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded','returned')),0)::bigint revenue,
+      coalesce(sum(grand_total) filter(where payment_status<>'paid' and status not in ('cancelled','refunded','returned')),0)::bigint outstanding
       from filtered group by payment_method order by revenue desc`,
-    sql`${filteredCte(range, where)} select coalesce(oi.product_id::text, 'deleted') product_id, oi.name, sum(oi.qty)::bigint units,
-      coalesce(sum(oi.line_total) filter(where f.payment_status='paid'),0)::bigint revenue
-      from filtered f join order_items oi on oi.order_id=f.id left join products p on p.id=oi.product_id
-      where f.status not in ('cancelled','refunded')
+    sql`${deliveredCte(range, where)} select coalesce(oi.product_id::text, 'deleted') product_id, oi.name, sum(oi.qty)::bigint units,
+      coalesce(sum(oi.line_total),0)::bigint revenue
+      from delivered f join order_items oi on oi.order_id=f.id left join products p on p.id=oi.product_id
+      where f.status='delivered' and f.payment_status='paid'
         and (${product}::text is null or oi.product_id::text=${product}) and (${category}::text is null or p.category_id::text=${category})
       group by oi.product_id, oi.name order by revenue desc, units desc limit 20`,
-    sql`${filteredCte(range, where)} select coalesce(c.name,'Uncategorised') name, sum(oi.qty)::bigint units,
-      coalesce(sum(oi.line_total) filter(where f.payment_status='paid'),0)::bigint revenue, count(distinct f.id)::int orders
-      from filtered f join order_items oi on oi.order_id=f.id left join products p on p.id=oi.product_id left join categories c on c.id=p.category_id
-      where f.status not in ('cancelled','refunded')
+    sql`${deliveredCte(range, where)} select coalesce(c.name,'Uncategorised') name, sum(oi.qty)::bigint units,
+      coalesce(sum(oi.line_total),0)::bigint revenue, count(distinct f.id)::int orders
+      from delivered f join order_items oi on oi.order_id=f.id left join products p on p.id=oi.product_id left join categories c on c.id=p.category_id
+      where f.status='delivered' and f.payment_status='paid'
         and (${product}::text is null or oi.product_id::text=${product}) and (${category}::text is null or p.category_id::text=${category})
       group by c.name order by revenue desc limit 20`,
-    sql`${filteredCte(range, where)} select coalesce(coupon_code,'No coupon') name, count(*)::int orders,
-      coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue,
-      coalesce(sum(discount_total),0)::bigint discounts from filtered group by coupon_code order by discounts desc limit 20`,
+    sql`${deliveredCte(range, where)} select coalesce(coupon_code,'No coupon') name, count(*)::int orders,
+      coalesce(sum(grand_total),0)::bigint revenue,coalesce(sum(discount_total),0)::bigint discounts
+      from delivered group by coupon_code order by discounts desc limit 20`,
     sql`select count(*)::int total,
       count(*) filter(where created_at >= ${range.start}::timestamptz and created_at < ${range.end}::timestamptz)::int new_count,
       count(*) filter(where marketing_opt_in)::int opted_in from customers`,
@@ -251,7 +268,7 @@ export async function getAnalytics(params) {
       from filtered f join orders o on o.id=f.id order by f.placed_at desc limit 12`,
     sql`select code from (select code from coupons union select distinct coupon_code as code from orders where coupon_code is not null and placed_at >= ${range.start}::timestamptz and placed_at < ${range.end}::timestamptz) c order by code limit 200`,
     sql`${filteredCte(prevRange, where)} select count(*)::int orders,
-      coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue
+      (select coalesce(sum(o.grand_total),0)::bigint from orders o where o.delivered_at >= ${prevRange.start}::timestamptz and o.delivered_at < ${prevRange.end}::timestamptz and o.status='delivered' and o.payment_status='paid' ${where})::bigint revenue
       from filtered`,
     Promise.all([
       sql`select id, name from products where is_active order by name limit 500`,
@@ -261,17 +278,21 @@ export async function getAnalytics(params) {
     ]),
     sql`${filteredCte(range, where)}
       , hours as (select generate_series(0,23)::int as hour_of_day),
-      order_hours as (select extract(hour from placed_at at time zone ${timezone})::int as hour_of_day, count(*)::int orders,
-        coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue
-        from filtered group by 1),
-      view_hours as (select extract(hour from created_at at time zone ${timezone})::int as hour_of_day, count(*)::int page_views,
-        count(distinct visitor_hash)::int visitor_days from page_views where created_at >= ${range.start}::timestamptz and created_at < ${range.end}::timestamptz group by 1)
-      select h.hour_of_day as hour, lpad(h.hour_of_day::text,2,'0')||':00' as date, coalesce(o.orders,0)::int orders, coalesce(o.revenue,0)::bigint revenue,
-        coalesce(v.page_views,0)::int page_views, coalesce(v.visitor_days,0)::int visitor_days
-      from hours h left join order_hours o using(hour_of_day) left join view_hours v using(hour_of_day) order by h.hour_of_day`,
-    sql`${filteredCte(range, where)} select extract(isodow from placed_at at time zone ${timezone})::int weekday,
-      count(*)::int orders, coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue
-      from filtered group by 1 order by 1`,
+      order_hours as (select extract(hour from placed_at at time zone ${timezone})::int as hour_of_day,count(*)::int orders from filtered group by 1),
+      delivery_hours as (select extract(hour from o.delivered_at at time zone ${timezone})::int as hour_of_day,coalesce(sum(o.grand_total),0)::bigint revenue
+        from orders o where o.delivered_at>=${range.start}::timestamptz and o.delivered_at<${range.end}::timestamptz and o.status='delivered' and o.payment_status='paid' ${where} group by 1),
+      view_hours as (select extract(hour from created_at at time zone ${timezone})::int as hour_of_day,count(*)::int page_views,count(distinct visitor_hash)::int visitor_days
+        from page_views where created_at>=${range.start}::timestamptz and created_at<${range.end}::timestamptz group by 1)
+      select h.hour_of_day as hour,lpad(h.hour_of_day::text,2,'0')||':00' as date,coalesce(o.orders,0)::int orders,coalesce(d.revenue,0)::bigint revenue,
+        coalesce(v.page_views,0)::int page_views,coalesce(v.visitor_days,0)::int visitor_days
+      from hours h left join order_hours o using(hour_of_day) left join delivery_hours d using(hour_of_day) left join view_hours v using(hour_of_day) order by h.hour_of_day`,
+    sql`with weekdays as (select generate_series(1,7)::int weekday),
+      order_weekdays as (select extract(isodow from placed_at at time zone ${timezone})::int weekday,count(*)::int orders from orders o
+        where o.placed_at>=${range.start}::timestamptz and o.placed_at<${range.end}::timestamptz ${where} group by 1),
+      delivery_weekdays as (select extract(isodow from o.delivered_at at time zone ${timezone})::int weekday,coalesce(sum(o.grand_total),0)::bigint revenue from orders o
+        where o.delivered_at>=${range.start}::timestamptz and o.delivered_at<${range.end}::timestamptz and o.status='delivered' and o.payment_status='paid' ${where} group by 1)
+      select w.weekday,coalesce(o.orders,0)::int orders,coalesce(d.revenue,0)::bigint revenue from weekdays w
+      left join order_weekdays o using(weekday) left join delivery_weekdays d using(weekday) order by w.weekday`,
     sql`select count(*) filter(where revoked_at is null and expires_at>now())::int valid_sessions,
       count(distinct (subject_type,subject_id)) filter(where revoked_at is null and expires_at>now())::int valid_accounts,
       count(distinct subject_id) filter(where subject_type='customer' and revoked_at is null and expires_at>now())::int valid_customer_accounts,
@@ -292,7 +313,7 @@ export async function getAnalytics(params) {
   const inventory = inventoryRows[0] || {};
   const counts = summary[0] || {};
   const series = seriesRows.map((r) => ({ ...r,
-    revenue: toNumber(r.revenue), discounts: toNumber(r.discounts), averageOrderValue: toNumber(r.average_order_value),
+    revenue: toNumber(r.revenue), grossOrderValue: toNumber(r.gross_order_value), paidOrderValue: toNumber(r.paid_order_value), discounts: toNumber(r.discounts), averageOrderValue: toNumber(r.average_order_value),
     orders: toNumber(r.orders), units: toNumber(r.units), pageViews: toNumber(r.page_views), visitorDays: toNumber(r.visitor_days),
     customers: toNumber(r.new_customers), newPurchasers: toNumber(r.new_purchasers), returningPurchasers: toNumber(r.returning_purchasers),
     customerSessions: toNumber(r.customer_sessions), adminSessions: toNumber(r.admin_sessions), stockDelta: toNumber(r.stock_delta),
@@ -335,8 +356,9 @@ export async function getAnalytics(params) {
       measuredAt: new Date().toISOString(),
     },
     totals: {
-      orders: totalOrders, revenue: toNumber(counts.revenue), grossPaid: toNumber(counts.revenue), outstanding,
-      discounts: toNumber(counts.discounts), delivered: toNumber(counts.delivered), paidOrders,
+      orders: totalOrders, revenue: toNumber(counts.revenue), deliveredPaidRevenue: toNumber(counts.revenue),
+      grossOrderValue: toNumber(counts.gross_order_value), paidOrderValue: toNumber(counts.paid_order_value), grossPaid: toNumber(counts.paid_order_value),
+      refundedAmount: null, outstanding, discounts: toNumber(counts.discounts), delivered: toNumber(counts.delivered), paidOrders,
       units: series.reduce((sum, row) => sum + row.units, 0), refunds: null,
       cancelled: canceled, refunded, returned, aov: toNumber(counts.aov), purchasingCustomers: toNumber(counts.purchasing_customers),
       deliveryRate: ratio(toNumber(counts.delivered), denominator), avgDeliverySeconds: toNumber(counts.avg_delivery_seconds),
@@ -385,7 +407,7 @@ export async function getAnalytics(params) {
     previous: { orders: toNumber(comparison[0]?.orders), revenue: toNumber(comparison[0]?.revenue) },
     notes: {
       currency: 'Revenue uses orders.grand_total in the configured base currency minor units (PKR by default); transaction display currency is not summed.',
-      revenue: 'Revenue is paid gross order value excluding cancelled/refunded statuses. There is no refund ledger, so this is not net of refunds or returns.',
+      revenue: 'Revenue is recognized paid delivered order value grouped by delivery timestamp and store timezone; cancelled, returned, refunded-status and unpaid orders are excluded. Gross placed order value and paid order value are separate order-date cohort measures. Actual refunded currency is unavailable because no refund ledger exists.',
       visitors: 'Visitor counts are distinct daily-rotating anonymous hashes (visitor-days), not deduplicated people or sessions. Historical visitor data only starts when instrumentation recorded it.',
       liveSessions: 'The live count is distinct accounts with non-revoked, unexpired login sessions at query time. It is not a real-time activity/presence signal; the schema does not record last activity.',
       loginHistory: 'Historical customer/admin login counts are sessions created in each time bucket, not unique active users.',

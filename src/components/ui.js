@@ -16,7 +16,9 @@ export function Stars({ rating = 0, count, size = 12 }) {
 }
 
 export function ProductCard({ product, money, priority = false, saved = false, onAdd, onSave, onQuick, sizes = '(max-width:720px) 50vw, (max-width:1180px) 33vw, 25vw' }) {
-  const hasCompare = product.compareAtPrice && product.compareAtPrice > product.price;
+  const displayPrice = Number(product.salePrice ?? product.price);
+  const originalPrice = product.promotion ? Number(product.basePrice ?? product.price) : Number(product.compareAtPrice || 0);
+  const hasCompare = originalPrice > displayPrice;
   return (
     <article className="pcard" data-product-id={product.id}>
       <div className="pcard-media-wrap">
@@ -24,7 +26,8 @@ export function ProductCard({ product, money, priority = false, saved = false, o
           {product.badge === 'new' && <span className="tag new">New Arrival</span>}
           {product.badge === 'bestseller' && <span className="tag">Bestseller</span>}
           {product.badge === 'limited' && <span className="tag limited">Limited offer</span>}
-          {hasCompare && <span className="tag sale">−{Math.round(100 - (product.price / product.compareAtPrice) * 100)}% off</span>}
+          {product.promotion && <span className="tag sale">{product.promotion.discountPercent}% event offer</span>}
+          {!product.promotion && hasCompare && <span className="tag sale">−{Math.round(100 - (displayPrice / originalPrice) * 100)}% off</span>}
           {product.stock === 0 && <span className="tag">Sold out</span>}
         </span>
       <Link href={`/products/${product.slug}`} className="pcard-media" aria-label={product.name} data-has-gallery={Boolean(product.image2 && product.image2 !== product.image)}>
@@ -57,8 +60,8 @@ export function ProductCard({ product, money, priority = false, saved = false, o
           {product.ratingCount > 0 ? <Stars rating={product.rating} count={product.ratingCount} /> : <span style={{ fontSize: 11.5 }}>{product.categoryName}</span>}
         </div>
         <span className="pcard-price">
-          <span>{money(product.price)}</span>
-          {hasCompare && <s>{money(product.compareAtPrice)}</s>}
+          <span>{money(displayPrice)}</span>
+          {hasCompare && <s>{money(originalPrice)}</s>}
         </span>
       </div>
     </article>

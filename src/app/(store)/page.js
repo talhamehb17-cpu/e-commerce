@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { getHomepageSections, listProducts, getCategories, getCollections, getBrands, getFeaturedReviews } from '@/lib/catalog';
+import { getActivePromotionEvents } from '@/lib/promotions';
 import { HomeSections } from '@/components/home-sections';
 
 export const revalidate = 30;
@@ -12,12 +13,13 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  const [sections, categories, collections, brands, reviews] = await Promise.all([
+  const [sections, categories, collections, brands, reviews, eventPromotions] = await Promise.all([
     getHomepageSections(),
     getCategories(),
     getCollections(),
     getBrands(),
     getFeaturedReviews(3),
+    getActivePromotionEvents({ publicOnly:true }).catch(()=>[]),
   ]);
 
   const needProducts = sections.some((s) => s.type === 'products');
@@ -32,6 +34,7 @@ export default async function HomePage() {
     collections,
     brands,
     reviews,
+    eventPromotions: eventPromotions.filter((event)=>event.banner_enabled && ['homepage_hero','home_section'].includes(event.placement)),
     products: {
       featured: featured.products,
       new: newest.products,

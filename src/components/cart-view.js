@@ -78,7 +78,8 @@ export function CartView({ items: initialItems, totals: initialTotals }) {
       <aside className="summary">
         <h3>Order summary</h3>
         <div className="summary-row"><span>Subtotal ({totals.itemCount} items)</span><span>{money(totals.subtotal)}</span></div>
-        {totals.discount > 0 && <div className="summary-row"><span>Discount {totals.coupon ? `(${totals.coupon.code})` : ''}</span><span style={{ color: 'var(--accent)' }}>−{money(totals.discount)}</span></div>}
+        {totals.eventDiscount > 0 && <div className="summary-row"><span>Event offer</span><span style={{ color: 'var(--accent)' }}>−{money(totals.eventDiscount)}</span></div>}
+        {totals.couponDiscount > 0 && <div className="summary-row"><span>Coupon {totals.coupon ? `(${totals.coupon.code})` : ''}</span><span style={{ color: 'var(--accent)' }}>−{money(totals.couponDiscount)}</span></div>}
         <div className="summary-row"><span>Delivery</span><span>{totals.shipping ? money(totals.shipping) : 'Free'}</span></div>
         <div className="summary-row total"><span>Total</span><span>{money(totals.total)}</span></div>
 

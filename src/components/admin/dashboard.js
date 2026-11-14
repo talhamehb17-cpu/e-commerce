@@ -18,6 +18,7 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
   const [dateTo, setDateTo] = useState(initial?.to || '');
   const [requestKey, setRequestKey] = useState(`range=${initial?.days || 30}`);
   const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(initial ? new Date() : null);
   const [error, setError] = useState(initialError);
   const [notifications, setNotifications] = useState([]);
   const [notificationError, setNotificationError] = useState('');
@@ -49,6 +50,7 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
         result.monthlyRevenueError = 'The dashboard response did not include monthly revenue data.';
       }
       setData(result);
+      setLastUpdated(new Date());
       if (!query.includes('&refresh=')) {
         setDateFrom(result.from || '');
         setDateTo(result.to || '');
@@ -115,7 +117,7 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>
-          <p>Live order, catalog and visitor data from your store database.</p>
+          <p>Live order, catalog and visitor data from your store database. {lastUpdated?`Last updated ${lastUpdated.toLocaleTimeString()} · refreshes automatically every 20 seconds while visible`:'Waiting for the first data refresh…'}</p>
         </div>
         <div className="dashboard-toolbar">
           <div className="seg" aria-label="Dashboard date range">
@@ -167,6 +169,8 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
       <div className="admin-grid kpi-grid dashboard-kpis">
         <Kpi label="Total delivered revenue · all time" value={data?money(t.revenueAll):'—'} delta="Paid delivered orders · returns excluded" icon={TrendingUp} />
         <Kpi label="Delivered revenue · selected period" value={data?money(t.revenue):'—'} delta={data?`${percent(t.revenueGrowth)} vs previous period · by delivery date`:'Data unavailable'} icon={TrendingUp} />
+        <Kpi label="Gross order value · placed this period" value={data?money(t.grossOrderValue):'—'} delta="Valid orders incl. unpaid COD · cancellations excluded · before returns/refunds" icon={TrendingUp} />
+        <Kpi label="Paid order value · placed this period" value={data?money(t.paidOrderValue):'—'} delta="Paid orders excluding cancelled, returned and refunded statuses" icon={TrendingUp} />
         <Kpi label="Orders · all time" value={data?compact(t.orders):'—'} delta={data?`${compact(t.ordersPeriod)} placed in selected period`:'Data unavailable'} icon={Package} href="/admin/orders" />
         <Kpi label="Customers · all time" value={data?compact(t.customers):'—'} delta={data?`${compact(t.customersPeriod)} registrations in period`:'Data unavailable'} icon={Users} href="/admin/customers" />
         <Kpi label="Visitor-days" value={data?compact(t.visitorDays):'—'} delta={data?`${compact(t.pageViews)} page views · daily anonymous hashes`:'Data unavailable'} icon={Eye} />

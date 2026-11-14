@@ -353,6 +353,66 @@ create table if not exists coupons (
   created_at timestamptz not null default now()
 );
 
+-- Storewide event promotions. Product/category membership is explicit; date windows are
+-- evaluated at request time so scheduled events activate/expire without a cron job.
+create table if not exists promotion_events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  tagline text,
+  banner_image text,
+  mobile_banner_image text,
+  placement text not null default 'home_section' check (placement in ('homepage_hero','home_section','category','product')),
+  cta_label text,
+  cta_href text,
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  discount_percent numeric(5,2) not null default 0 check (discount_percent between 0 and 100),
+  apply_to_all boolean not null default false,
+  combine_with_coupon boolean not null default false,
+  is_enabled boolean not null default true,
+  is_paused boolean not null default false,
+  announcement_enabled boolean not null default false,
+  banner_enabled boolean not null default false,
+  announcement_color text not null default '#171512',
+  announcement_text_color text not null default '#ffffff',
+  announcement_speed int not null default 24 check (announcement_speed between 8 and 120),
+  priority int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (ends_at > starts_at)
+);
+create index if not exists idx_promotion_events_window on promotion_events(is_enabled,is_paused,starts_at,ends_at,priority desc);
+create table if not exists promotion_event_products (
+  event_id uuid not null references promotion_events(id) on delete cascade,
+  product_id uuid not null references products(id) on delete cascade,
+  primary key(event_id,product_id)
+);
+create table if not exists promotion_event_categories (
+  event_id uuid not null references promotion_events(id) on delete cascade,
+  category_id uuid not null references categories(id) on delete cascade,
+  primary key(event_id,category_id)
+);
+create table if not exists promotion_event_activity (
+  id bigserial primary key,
+  event_id uuid not null references promotion_events(id) on delete cascade,
+  activity_type text not null check (activity_type in ('event_view','banner_click','product_view','add_to_cart','order')),
+  visitor_hash text,
+  product_id uuid references products(id) on delete set null,
+  order_id uuid references orders(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_promotion_event_activity_event_time on promotion_event_activity(event_id,created_at desc,activity_type);
+create table if not exists order_promotion_events (
+  order_id uuid not null references orders(id) on delete cascade,
+  event_id uuid not null references promotion_events(id) on delete cascade,
+  discount_total int not null default 0 check (discount_total >= 0),
+  primary key(order_id,event_id)
+);
+alter table orders add column if not exists promotion_event_id uuid references promotion_events(id) on delete set null;
+alter table orders add column if not exists promotion_discount_total int not null default 0;
+alter table orders add column if not exists coupon_discount_total int not null default 0;
+
 create table if not exists currencies (
   code text primary key,
   name text not null,

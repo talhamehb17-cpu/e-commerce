@@ -1,4 +1,5 @@
 import { sql, cached } from './db.js';
+import { priceProducts, applyPromotionPrice, getActivePromotionEvents, pickPromotion } from './promotions.js';
 
 const IMG = {
   electronics: '/images/products/electronics-headphones-1.jpg',
@@ -51,7 +52,7 @@ export function resolveImage(url, categorySlug, index = 0) {
 }
 
 const PRODUCT_COLUMNS = sql`
-  p.id, p.slug, p.name, p.subtitle, p.price, p.compare_at_price, p.stock, p.badge,
+  p.id, p.category_id, p.slug, p.name, p.subtitle, p.price, p.compare_at_price, p.stock, p.badge,
   p.is_featured, p.rating_avg, p.rating_count, p.sold_count, p.created_at, p.material,
   c.slug as category_slug, c.name as category_name,
   b.slug as brand_slug, b.name as brand_name,
@@ -112,7 +113,8 @@ export async function listProducts({
   const countRows = await sql`
     select count(*)::int n from products p left join categories c on c.id = p.category_id ${filter}
   `;
-  return { products: rows.map(shapeProduct), total: countRows[0].n };
+  const priced = await priceProducts(rows);
+  return { products: priced.map(shapeProduct), total: countRows[0].n };
 }
 
 export function shapeProduct(r) {
@@ -122,6 +124,9 @@ export function shapeProduct(r) {
     name: r.name,
     subtitle: r.subtitle,
     price: Number(r.price),
+    basePrice: Number(r.basePrice ?? r.price),
+    salePrice: Number(r.salePrice ?? r.price),
+    promotion: r.promotion || null,
     compareAtPrice: r.compare_at_price == null ? null : Number(r.compare_at_price),
     stock: r.stock,
     badge: r.badge,
@@ -149,6 +154,8 @@ export async function getProductBySlug(slug) {
   `;
   const p = rows[0];
   if (!p) return null;
+  const activePromotions = await getActivePromotionEvents();
+  const promotedProduct = applyPromotionPrice(p, pickPromotion(activePromotions, p.id, p.category_id));
   const [images, variants, related, reviews] = await Promise.all([
     sql`select id, url, alt, position from product_images where product_id = ${p.id} order by position`,
     sql`select id, name, option_name, price_delta, sku, stock, position from product_variants where product_id = ${p.id} order by position`,
@@ -160,8 +167,9 @@ export async function getProductBySlug(slug) {
   const gallery = images.length
     ? images.map((i) => ({ ...i, url: resolveImage(i.url, p.category_slug, i.position) }))
     : [{ url: resolveImage(null, p.category_slug, 0), alt: p.name, position: 0 }];
+  const pricedRelated = await priceProducts(related);
   return {
-    ...shapeProduct({ ...p, image: gallery[0].url, image2: gallery[1]?.url }),
+    ...shapeProduct({ ...promotedProduct, image: gallery[0].url, image2: gallery[1]?.url }),
     description: p.description,
     story: p.story,
     sku: p.sku,
@@ -170,7 +178,7 @@ export async function getProductBySlug(slug) {
     tags: p.tags,
     gallery,
     variants: variants.map((v) => ({ ...v, priceDelta: Number(v.price_delta) })),
-    related: related.map(shapeProduct),
+    related: pricedRelated.map(shapeProduct),
     reviews,
     isActive: p.is_active,
   };
@@ -260,7 +268,7 @@ export async function getCollectionProducts(collectionId, limit = 24) {
     left join brands b on b.id = p.brand_id
     where cp.collection_id = ${collectionId} and p.is_active
     order by cp.position, p.created_at desc limit ${limit}`;
-  return rows.map(shapeProduct);
+  return (await priceProducts(rows)).map(shapeProduct);
 }
 
 export async function getFeaturedReviews(limit = 3) {
@@ -290,7 +298,7 @@ export async function searchSuggestions(q, limit = 6) {
         order by p.is_featured desc limit ${limit}`,
     sql`select slug, name from categories where name ilike ${term} limit 4`,
   ]);
-  return { products: products.map(shapeProduct), categories };
+  return { products: (await priceProducts(products)).map(shapeProduct), categories };
 }
 
 export async function getProductsByIds(ids) {
@@ -299,7 +307,7 @@ export async function getProductsByIds(ids) {
     select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id left join brands b on b.id = p.brand_id
     where p.id = any(${ids}::uuid[]) and p.is_active
   `;
-  return rows.map(shapeProduct);
+  return (await priceProducts(rows)).map(shapeProduct);
 }
 
 export async function getProductsBySlugs(slugs) {
@@ -308,5 +316,5 @@ export async function getProductsBySlugs(slugs) {
     select ${PRODUCT_COLUMNS} from products p left join categories c on c.id = p.category_id left join brands b on b.id = p.brand_id
     where p.slug = any(${slugs}::text[]) and p.is_active
   `;
-  return rows.map(shapeProduct);
+  return (await priceProducts(rows)).map(shapeProduct);
 }

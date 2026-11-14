@@ -88,7 +88,7 @@ export function SearchModal({ open, onClose }) {
                     <div className="serif" style={{ fontSize: 17 }}>{p.name}</div>
                     <div className="muted" style={{ fontSize: 11.5 }}>{p.categoryName}</div>
                   </div>
-                  <div style={{ fontSize: 12.5 }}>{money(p.price)}</div>
+                  <div style={{ fontSize: 12.5 }}>{money(p.salePrice ?? p.price)}{p.promotion&&<s style={{marginLeft:6,opacity:.55}}>{money(p.price)}</s>}</div>
                 </Link>
               ))}
             </div>

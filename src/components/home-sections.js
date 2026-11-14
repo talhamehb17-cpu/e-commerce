@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useStore } from './providers';
@@ -15,10 +15,20 @@ import { ArrowRight, Instagram, Sparkles } from './icons';
 export function HomeSections({ sections, data }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [quick, setQuick] = useState(null);
+  const [livePromotionEvents,setLivePromotionEvents]=useState(data.eventPromotions||[]);
   const cartState = useCart(() => setCartOpen(true));
-
+  useEffect(()=>{
+    let active=true;
+    const refresh=()=>fetch('/api/events/active',{cache:'no-store'}).then(res=>res.ok?res.json():null).then(body=>{if(active&&body?.events)setLivePromotionEvents(body.events.filter(event=>event.banner_enabled&&['homepage_hero','home_section'].includes(event.placement)))}).catch(()=>{});
+    const timer=window.setInterval(refresh,20_000);window.addEventListener('focus',refresh);
+    return()=>{active=false;window.clearInterval(timer);window.removeEventListener('focus',refresh)};
+  },[]);
+  const heroEvents=livePromotionEvents.filter((event)=>event.placement==='homepage_hero');
+  const sectionEvents=livePromotionEvents.filter((event)=>event.placement==='home_section');
   return (
     <>
+      {heroEvents.map((event)=><EventPromotionBanner key={event.id} event={event} hero/>)}
+      {sectionEvents.map((event)=><EventPromotionBanner key={event.id} event={event}/>)}
       {sections.map((s, idx) => {
         const config = s.config || {};
         switch (s.type) {
@@ -68,6 +78,17 @@ export function HomeSections({ sections, data }) {
       <QuickView product={quick} open={Boolean(quick)} onClose={() => setQuick(null)} openCart={() => setCartOpen(true)} />
     </>
   );
+}
+
+export function EventPromotionBanner({event,hero=false}) {
+  useEffect(()=>{fetch('/api/events/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:event.id,activityType:'event_view'})}).catch(()=>{})},[event.id]);
+  const href=event.cta_href||'/shop';
+  return <section className={`event-promo-banner${hero?' event-promo-hero':''}`}>
+    <Link href={href} onClick={()=>fetch('/api/events/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:event.id,activityType:'banner_click'})}).catch(()=>{})} aria-label={event.cta_label||`Shop ${event.title}`}>
+      {event.banner_image&&<><Image className="event-promo-desktop" src={event.banner_image} alt={event.title} fill sizes="100vw" quality={78}/>{event.mobile_banner_image&&<Image className="event-promo-mobile" src={event.mobile_banner_image} alt="" fill sizes="100vw" quality={78}/>}</>}
+      <span className="event-promo-shade"/><span className="event-promo-copy"><small>{event.title} · {event.discount_percent}% OFF</small><strong>{event.tagline||event.title}</strong>{event.cta_label&&<i>{event.cta_label} <ArrowRight size={14}/></i>}</span>
+    </Link>
+  </section>;
 }
 
 const HERO_LAYOUT_BY_STYLE={

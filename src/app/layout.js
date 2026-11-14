@@ -6,6 +6,7 @@ import { getCurrencies } from '@/lib/currency';
 import { getSetting } from '@/lib/settings';
 import { getTheme, themeCssVars } from '@/lib/themes';
 import { sql } from '@/lib/db';
+import { getActivePromotionEvents } from '@/lib/promotions';
 import { StoreProvider } from '@/components/providers';
 import { ToastHost } from '@/components/toast';
 import { ThemeSwitcher } from '@/components/theme-switcher';
@@ -44,13 +45,14 @@ async function getCatalogueMeta() {
 }
 
 export default async function RootLayout({ children }) {
-  const [customer, themeConfig, currencies, store, seasonal, promotions] = await Promise.all([
+  const [customer, themeConfig, currencies, store, seasonal, promotions, eventPromotions] = await Promise.all([
     getCurrentCustomer(),
     getThemeConfig(),
     getCurrencies(),
     getSetting('store'),
     getSetting('seasonal'),
     getSetting('promotions'),
+    getActivePromotionEvents({ publicOnly: true }).catch(() => []),
   ]);
   const resolved = resolveTheme(themeConfig, customer);
   const theme = getTheme(resolved.slug);
@@ -101,7 +103,7 @@ export default async function RootLayout({ children }) {
             currency: customer?.currency || defaultCurrency,
             currencies,
             theme: { slug: theme.slug, source: resolved.source, allowOverride: themeConfig.allowOverride, allowFontOverride: themeConfig.allowFontOverride, fonts: resolved.fonts || { heading: theme.font, body: 'Inter' }, fontPersonal: Boolean(customer?.font_preference?.enabled && themeConfig.allowFontOverride), defaultSlug: themeConfig.palette, defaultFonts: themeConfig.fonts || { heading: getTheme(themeConfig.palette).font, body: 'Inter' }, themes: themeConfig.themes },
-            store: { name: store.name, tagline: store.tagline, announcement, instagram: store.instagram, facebook: store.facebook, email: store.email, whatsapp: store.whatsapp },
+            store: { name: store.name, tagline: store.tagline, announcement, activePromotions: eventPromotions.map((event)=>({id:event.id,title:event.title,tagline:event.tagline,starts_at:event.starts_at,ends_at:event.ends_at,announcement_enabled:event.announcement_enabled,banner_enabled:event.banner_enabled,announcement_color:event.announcement_color,announcement_text_color:event.announcement_text_color,announcement_speed:event.announcement_speed,cta_href:event.cta_href,cta_label:event.cta_label,banner_image:event.banner_image,mobile_banner_image:event.mobile_banner_image,placement:event.placement,discount_percent:Number(event.discount_percent)})), instagram: store.instagram, facebook: store.facebook, email: store.email, whatsapp: store.whatsapp },
             catalogMeta: meta,
           }}
         >

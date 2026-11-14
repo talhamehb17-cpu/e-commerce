@@ -91,7 +91,9 @@ export function AdminOrderDetail({ id }) {
             </div>
             <div style={{ marginTop: 14, maxWidth: 300, marginLeft: 'auto' }}>
               <div className="summary-row"><span>Subtotal</span><span>{money(order.subtotal)}</span></div>
-              {order.discount_total > 0 && <div className="summary-row"><span>Discount {order.coupon_code ? `(${order.coupon_code})` : ''}</span><span>−{money(order.discount_total)}</span></div>}
+              {Number(order.promotion_discount_total)>0&&<div className="summary-row"><span>Event promotion</span><span>−{money(order.promotion_discount_total)}</span></div>}
+              {Number(order.coupon_discount_total)>0&&<div className="summary-row"><span>Coupon {order.coupon_code?`(${order.coupon_code})`:''}</span><span>−{money(order.coupon_discount_total)}</span></div>}
+              {Number(order.promotion_discount_total||0)+Number(order.coupon_discount_total||0)===0&&order.discount_total>0&&<div className="summary-row"><span>Discount {order.coupon_code?`(${order.coupon_code})`:''}</span><span>−{money(order.discount_total)}</span></div>}
               <div className="summary-row"><span>Shipping</span><span>{order.shipping_total ? money(order.shipping_total) : 'Free'}</span></div>
               {order.tax_total > 0 && <div className="summary-row"><span>Tax</span><span>{money(order.tax_total)}</span></div>}
               <div className="summary-row total"><span>Total</span><span>{money(order.grand_total)}</span></div>

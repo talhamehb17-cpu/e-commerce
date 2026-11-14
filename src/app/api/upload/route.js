@@ -18,7 +18,7 @@ function validImageSignature(type, b) {
 export async function POST(request) {
   const [customer, admin] = await Promise.all([getCurrentCustomer(), getCurrentAdmin()]);
   if (!customer && !admin) return NextResponse.json({ error: 'Sign in to upload images.' }, { status: 401 });
-  if (admin && !can(admin, 'products:write')) return NextResponse.json({ error: 'Not permitted to upload catalog images.' }, { status: 403 });
+  if (admin && !can(admin, 'products:write') && !can(admin, 'content:write')) return NextResponse.json({ error: 'Not permitted to upload catalog images.' }, { status: 403 });
   const announcedLength = Number(request.headers.get('content-length') || 0);
   if (announcedLength > MAX_BYTES + 64 * 1024) return NextResponse.json({ error: 'Max file size is 6MB.' }, { status: 413 });
   const key = admin ? `admin:${admin.id}` : `customer:${customer.id}`;

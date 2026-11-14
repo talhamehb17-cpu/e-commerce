@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { listProducts, getCollections, getCategories } from '@/lib/catalog';
 import { Breadcrumb } from '@/components/ui';
 import { ShopBrowser } from '@/components/shop-browser';
+import { getActivePromotionEvents } from '@/lib/promotions';
+import { EventPromotionBanner } from '@/components/home-sections';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +26,8 @@ export default async function CollectionPage({ params, searchParams }) {
   const page = Math.max(1, Number(sp.page || 1));
   const perPage = 12;
   const isCategory = Boolean(category) && !collection;
+  const activeEvents=isCategory?await getActivePromotionEvents({publicOnly:true}).catch(()=>[]):[];
+  const categoryPromotions=activeEvents.filter(event=>event.banner_enabled&&event.placement==='category'&&(event.apply_to_all||event.categoryIds.includes(category.id)));
   const { products, total } = await listProducts({
     ...(isCategory ? { category: slug } : { collection: slug }),
     sort: sp.sort || 'featured',
@@ -50,6 +54,7 @@ export default async function CollectionPage({ params, searchParams }) {
         </div>
       </div>
       <div className="wrap">
+        {categoryPromotions.map(event=><EventPromotionBanner key={event.id} event={event}/>)}
         <ShopBrowser
           products={products} total={total} page={page} perPage={perPage}
           categories={categories} brands={[]} params={{ ...sp, page: undefined }}

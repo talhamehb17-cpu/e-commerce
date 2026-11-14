@@ -8,6 +8,7 @@ import { useCart } from './cart-drawer';
 import { CartDrawer } from './cart-drawer';
 import { toast } from './toast';
 import { ShopGrid } from './shop';
+import { EventPromotionBanner } from './home-sections';
 import { Stars, Breadcrumb, SectionHead } from './ui';
 import { ReviewSection } from './reviews';
 import { Truck, RotateCcw, ShieldCheck, Heart, Minus, Plus, ZoomIn, Check } from './icons';
@@ -34,8 +35,13 @@ export function ProductDetail({ product, related, saved: initiallySaved, custome
       || product.variants[0]
     : null;
 
-  const price = product.price + (chosenVariant?.priceDelta || 0);
-  const compare = product.compareAtPrice;
+  const basePrice = product.price + (chosenVariant?.priceDelta || 0);
+  const price = product.promotion ? Math.max(0, Math.round(basePrice * (100 - product.promotion.discountPercent) / 100)) : basePrice;
+  const compare = product.promotion ? basePrice : product.compareAtPrice;
+
+  useEffect(() => {
+    if(product.promotion?.id)fetch('/api/events/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:product.promotion.id,activityType:'product_view',productId:product.id})}).catch(()=>{});
+  }, [product.id,product.promotion?.id]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') setZoom(false); };
@@ -59,8 +65,11 @@ export function ProductDetail({ product, related, saved: initiallySaved, custome
 
   const stock = chosenVariant ? chosenVariant.stock : product.stock;
 
+  const productEvent=product.promotion?.bannerEnabled&&product.promotion.placement==='product'?{id:product.promotion.id,title:product.promotion.title,tagline:product.promotion.tagline,banner_image:product.promotion.bannerImage,mobile_banner_image:product.promotion.mobileBannerImage,cta_label:product.promotion.ctaLabel,cta_href:product.promotion.ctaHref,discount_percent:product.promotion.discountPercent}:null;
+
   return (
     <>
+      {productEvent&&<EventPromotionBanner event={productEvent}/>}
       <div className="wrap" style={{ paddingTop: 18 }}>
         <Breadcrumb items={[
           { label: 'Home', href: '/' },

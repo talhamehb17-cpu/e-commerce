@@ -55,7 +55,7 @@ export function QuickView({ product, open, onClose, openCart }) {
             <div className="eyebrow">{product.brandName || product.categoryName}</div>
             <h3 style={{ fontSize: 28, margin: '8px 0 10px' }}>{product.name}</h3>
             <Stars rating={product.rating} count={product.ratingCount} />
-            <div style={{ fontSize: 20, fontFamily: 'var(--serif)', margin: '14px 0' }}>{money(product.price)}</div>
+            <div style={{ fontSize: 20, fontFamily: 'var(--serif)', margin: '14px 0' }}>{money(product.salePrice ?? product.price)}{product.promotion&&<s style={{marginLeft:8,fontSize:14,opacity:.6}}>{money(product.price)}</s>}</div>
             <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.7, minHeight: 60 }}>
               {product.subtitle || 'Considered materials, honest pricing and free returns within 30 days.'}
             </p>
