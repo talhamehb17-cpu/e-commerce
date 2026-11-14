@@ -40,7 +40,7 @@ export async function getAdminStats(period) {
   const toExclusive = bounds[0].end;
   const previousStart = previousBounds[0].start;
   const previousEnd = previousBounds[0].end;
-  const [totals, recentOrders, lowStockProducts, monthlyRevenue] = await Promise.all([
+  const [totals, recentOrders, lowStockProducts] = await Promise.all([
     sql`select
       (select count(*)::int from orders) orders_all,
       (select count(*)::int from orders where placed_at >= ${fromTs} and placed_at < ${toExclusive}) orders_period,
@@ -61,7 +61,11 @@ export async function getAdminStats(period) {
     sql`select o.id,o.order_number,o.status,o.grand_total,o.currency,o.placed_at,
       o.shipping_address->>'full_name' as customer_name from orders o order by o.placed_at desc limit 8`,
     sql`select id,name,slug,stock,low_stock_threshold from products where stock <= low_stock_threshold and is_active order by stock asc limit 8`,
-    sql`with bounds as (
+  ]);
+  let monthlyRevenue = [];
+  let monthlyRevenueError = null;
+  try {
+    monthlyRevenue = await sql`with bounds as (
       select date_trunc('month', now() at time zone ${timezone}) - interval '11 months' first_month,
         date_trunc('month', now() at time zone ${timezone}) last_month
     ), months as (
@@ -75,8 +79,11 @@ export async function getAdminStats(period) {
       group by 1
     )
     select to_char(m.local_month,'YYYY-MM') as month,to_char(m.local_month,'Mon') as label,coalesce(s.revenue,0)::bigint revenue
-    from months m left join sales s using(local_month) order by m.local_month`,
-  ]);
+    from months m left join sales s using(local_month) order by m.local_month`;
+  } catch (error) {
+    monthlyRevenueError = 'Monthly revenue could not be loaded from the database. Retry the dashboard request.';
+    console.error('Admin monthly revenue aggregation failed:', error?.message || 'unknown error');
+  }
   const row = totals[0] || {};
   const revenue = num(row.revenue_period);
   const ordersPeriod = num(row.orders_period);
@@ -93,6 +100,7 @@ export async function getAdminStats(period) {
     },
     recentOrders: recentOrders.map((order)=>({...order,grand_total:num(order.grand_total)})),
     monthlyRevenue: monthlyRevenue.map((row)=>({...row,revenue:num(row.revenue)})),
+    monthlyRevenueError,
     lowStockProducts,
     notes: { revenue:'Paid gross order value in base currency; excludes cancelled/refunded statuses and is not adjusted by a refund ledger.', visitors:'Counts are visitor-days from daily-rotating hashes, not deduplicated people.' },
   };

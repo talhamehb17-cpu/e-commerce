@@ -39,8 +39,15 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
     setError('');
     try {
       const res = await fetch(`/api/admin/stats?${query}`, { cache: 'no-store', signal });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || `Statistics request failed (${res.status})`);
+      const raw = await res.text();
+      let result;
+      try { result = raw ? JSON.parse(raw) : null; } catch { result = null; }
+      if (!res.ok) throw new Error(result?.error || `Dashboard statistics request failed (HTTP ${res.status}).`);
+      if (!result) throw new Error('Dashboard statistics returned an empty response.');
+      if (!Array.isArray(result.monthlyRevenue)) {
+        result.monthlyRevenue = [];
+        result.monthlyRevenueError = 'The dashboard response did not include monthly revenue data.';
+      }
       setData(result);
       setDateFrom(result.from || '');
       setDateTo(result.to || '');
@@ -147,7 +154,7 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
       </div>
       <section className="panel dashboard-revenue-panel" aria-label="Monthly revenue graph">
         <div className="panel-head"><div><h3>Monthly revenue</h3><p className="sub">Paid gross order value, base-currency PKR · cancelled/refunded statuses excluded; not profit or refund-adjusted net revenue</p></div><span className="eyebrow">Last 12 months</span></div>
-        <MonthlyRevenueGraph rows={data?.monthlyRevenue||[]} />
+        <MonthlyRevenueGraph rows={data?.monthlyRevenue||[]} error={data?.monthlyRevenueError||error} loading={loading} onRetry={() => setRequestKey((key) => `${key}&refresh=${Date.now()}`)} />
       </section>
       <div className="admin-grid dashboard-grid dashboard-grid-last">
         <section className="panel panel-table">
@@ -168,7 +175,7 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
   );
 }
 
-function MonthlyRevenueGraph({ rows = [] }) {
+function MonthlyRevenueGraph({ rows = [], error = '', loading = false, onRetry }) {
   const [hovered, setHovered] = useState(null);
   const W=820,H=300,pad={left:78,right:22,top:20,bottom:55};
   const width=W-pad.left-pad.right,height=H-pad.top-pad.bottom;
@@ -180,7 +187,8 @@ function MonthlyRevenueGraph({ rows = [] }) {
   const moneyTick=(minor)=>`Rs ${new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(minor/100)}`;
   const labelIndexes=[...new Set([0,2,4,6,8,10,rows.length-1].filter((i)=>i>=0&&i<rows.length))];
   const selected=hovered==null?null:points[hovered];
-  if(!rows.length)return <div className="dashboard-revenue-empty">Monthly revenue history is unavailable for this range.</div>;
+  if(!rows.length)return <div className="dashboard-revenue-empty" role={error?'alert':'status'}>{error?<>Monthly revenue could not be loaded: {error} <button type="button" className="btn btn-outline btn-sm" onClick={onRetry} disabled={loading}>{loading?'Retrying…':'Retry revenue data'}</button></>:loading?'Loading monthly revenue…':'Monthly revenue history is unavailable.'}</div>;
+  const hasRevenue = rows.some((row)=>Number(row.revenue)>0);
   return <div className="dashboard-revenue-chart-wrap">
     <svg className="dashboard-revenue-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Monthly paid gross revenue line graph with month labels and PKR scale">
       {Array.from({length:6},(_,index)=>{const y=pad.top+height-height*index/5;return <g key={index}><line x1={pad.left} x2={W-pad.right} y1={y} y2={y} className="dashboard-revenue-gridline"/><text x={pad.left-10} y={y+4} textAnchor="end" className="dashboard-revenue-axis-label">{moneyTick(max*index/5)}</text></g>})}
@@ -190,6 +198,7 @@ function MonthlyRevenueGraph({ rows = [] }) {
       {points.map(({x,y,row},index)=><circle key={row.month} cx={x} cy={y} r="4" tabIndex={0} role="graphics-symbol" aria-label={`${row.month}: ${money(row.revenue)} paid gross revenue`} className="dashboard-revenue-point" onMouseEnter={()=>setHovered(index)} onMouseLeave={()=>setHovered(null)} onFocus={()=>setHovered(index)} onBlur={()=>setHovered(null)} />)}
       {labelIndexes.map((index)=><g key={rows[index].month}><line x1={points[index].x} x2={points[index].x} y1={pad.top+height} y2={pad.top+height+5} className="dashboard-revenue-axis"/><text x={points[index].x} y={H-25} textAnchor="middle" className="dashboard-revenue-axis-label">{rows[index].label} ’{rows[index].month.slice(2,4)}</text></g>)}
     </svg>
+    {!hasRevenue&&<p className="dashboard-revenue-zero" role="status">No paid revenue recorded in these 12 calendar months. The graph reflects paid orders only.</p>}
     {selected&&<div className="dashboard-revenue-tooltip" aria-live="polite"><small>{selected.row.month}</small><strong>{money(selected.row.revenue)}</strong><span>Paid gross revenue</span></div>}
   </div>;
 }

@@ -1150,5 +1150,6 @@ html[data-style='utility'] .hero-marketplace-label{border-radius:6px}
 .dashboard-revenue-tooltip{position:absolute;right:12px;top:10px;display:grid;gap:3px;min-width:130px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:var(--shadow);font-variant-numeric:tabular-nums;pointer-events:none}
 .dashboard-revenue-tooltip small,.dashboard-revenue-tooltip span{font-size:10px;color:var(--muted)}
 .dashboard-revenue-tooltip strong{font-size:17px}
-.dashboard-revenue-empty{min-height:150px;display:grid;place-items:center;color:var(--muted);font-size:13px}
-@media(max-width:560px){.dashboard-revenue-panel{padding:12px}.dashboard-revenue-axis-label{font-size:9px}}
+.dashboard-revenue-empty{min-height:150px;display:grid;place-items:center;gap:12px;color:var(--muted);font-size:13px;text-align:center}
+.dashboard-revenue-zero{margin:0 0 6px;text-align:center;color:var(--muted);font-size:12px}
+@media(max-width:560px){.dashboard-revenue-panel{padding:12px}.dashboard-revenue-axis-label{font-size:9px}.dashboard-revenue-zero{font-size:11px}}
