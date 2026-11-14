@@ -1144,9 +1144,16 @@ html[data-style='utility'] .hero-marketplace-label{border-radius:6px}
 .dashboard-revenue-gridline{stroke:var(--line);stroke-width:1;stroke-dasharray:3 5;opacity:.75}
 .dashboard-revenue-axis{stroke:var(--muted);stroke-width:1;opacity:.8}
 .dashboard-revenue-axis-label{fill:var(--muted);font:11px var(--sans,system-ui,sans-serif)}
-.dashboard-revenue-line{stroke:var(--accent);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.dashboard-revenue-point{fill:var(--surface);stroke:var(--accent);stroke-width:2.5;vector-effect:non-scaling-stroke;cursor:crosshair;outline:none}
+.dashboard-revenue-line{stroke:var(--accent);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;stroke-dasharray:1600;stroke-dashoffset:1600;animation:dashboard-revenue-draw 1.1s cubic-bezier(.22,.8,.25,1) forwards}
+.dashboard-revenue-point{fill:var(--surface);stroke:var(--accent);stroke-width:2.5;vector-effect:non-scaling-stroke;cursor:crosshair;outline:none;opacity:0;transform-box:fill-box;transform-origin:center;animation:dashboard-revenue-point-in .35s ease-out forwards;transition:fill .2s ease,r .2s ease}
 .dashboard-revenue-point:hover,.dashboard-revenue-point:focus-visible{fill:var(--accent);r:5}
+.dashboard-chart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 4px}
+.dashboard-chart-toggle button{min-width:82px}
+.dashboard-refresh-indicator{font-size:10px;color:var(--muted);animation:dashboard-refresh-fade 1.2s ease-in-out infinite alternate}
+@keyframes dashboard-revenue-draw{to{stroke-dashoffset:0}}
+@keyframes dashboard-revenue-point-in{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
+@keyframes dashboard-refresh-fade{to{opacity:.55}}
+@media(prefers-reduced-motion:reduce){.dashboard-revenue-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.dashboard-revenue-point,.dashboard-refresh-indicator{animation:none;opacity:1}.dashboard-revenue-point{transition:none}.seg button{transition:none}}
 .dashboard-revenue-tooltip{position:absolute;right:12px;top:10px;display:grid;gap:3px;min-width:130px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:var(--shadow);font-variant-numeric:tabular-nums;pointer-events:none}
 .dashboard-revenue-tooltip small,.dashboard-revenue-tooltip span{font-size:10px;color:var(--muted)}
 .dashboard-revenue-tooltip strong{font-size:17px}

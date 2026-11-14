@@ -52,9 +52,9 @@ export async function getAdminStats(period) {
       (select count(*)::int from orders where status='pending' and placed_at >= ${fromTs} and placed_at < ${toExclusive}) pending_orders,
       (select count(*)::int from page_views where created_at >= ${fromTs} and created_at < ${toExclusive}) page_views,
       (select count(distinct visitor_hash)::int from page_views where visitor_hash is not null and created_at >= ${fromTs} and created_at < ${toExclusive}) visitor_days,
-      (select coalesce(sum(grand_total),0)::bigint from orders where payment_status='paid' and status not in ('cancelled','refunded') and placed_at >= ${fromTs} and placed_at < ${toExclusive}) revenue_period,
-      (select coalesce(sum(grand_total),0)::bigint from orders where payment_status='paid' and status not in ('cancelled','refunded')) revenue_all,
-      (select coalesce(sum(grand_total),0)::bigint from orders where payment_status='paid' and status not in ('cancelled','refunded') and placed_at >= ${previousStart} and placed_at < ${previousEnd}) revenue_previous,
+      (select coalesce(sum(grand_total),0)::bigint from orders where payment_status='paid' and status='delivered' and delivered_at >= ${fromTs} and delivered_at < ${toExclusive}) revenue_period,
+      (select coalesce(sum(grand_total),0)::bigint from orders where payment_status='paid' and status='delivered') revenue_all,
+      (select coalesce(sum(grand_total),0)::bigint from orders where payment_status='paid' and status='delivered' and delivered_at >= ${previousStart} and delivered_at < ${previousEnd}) revenue_previous,
       (select count(*)::int from orders where placed_at >= ${previousStart} and placed_at < ${previousEnd}) orders_previous,
       (select count(*)::int from customers where created_at >= ${previousStart} and created_at < ${previousEnd}) customers_previous
     `,
@@ -71,14 +71,17 @@ export async function getAdminStats(period) {
     ), months as (
       select generate_series(first_month,last_month,interval '1 month') as local_month from bounds
     ), sales as (
-      select date_trunc('month',o.placed_at at time zone ${timezone}) as local_month,
-        coalesce(sum(o.grand_total) filter(where o.payment_status='paid' and o.status not in ('cancelled','refunded')),0)::bigint revenue
+      select date_trunc('month',o.delivered_at at time zone ${timezone}) as local_month,
+        coalesce(sum(o.grand_total),0)::bigint revenue,
+        count(*)::int deliveries
       from orders o cross join bounds b
-      where o.placed_at >= (b.first_month at time zone ${timezone})
-        and o.placed_at < ((b.last_month + interval '1 month') at time zone ${timezone})
+      where o.payment_status='paid' and o.status='delivered'
+        and o.delivered_at >= (b.first_month at time zone ${timezone})
+        and o.delivered_at < ((b.last_month + interval '1 month') at time zone ${timezone})
       group by 1
     )
-    select to_char(m.local_month,'YYYY-MM') as month,to_char(m.local_month,'Mon') as label,coalesce(s.revenue,0)::bigint revenue
+    select to_char(m.local_month,'YYYY-MM') as month,to_char(m.local_month,'Mon') as label,
+      coalesce(s.revenue,0)::bigint revenue,coalesce(s.deliveries,0)::int deliveries
     from months m left join sales s using(local_month) order by m.local_month`;
   } catch (error) {
     monthlyRevenueError = 'Monthly revenue could not be loaded from the database. Retry the dashboard request.';
@@ -99,9 +102,9 @@ export async function getAdminStats(period) {
       conversionRate: null,
     },
     recentOrders: recentOrders.map((order)=>({...order,grand_total:num(order.grand_total)})),
-    monthlyRevenue: monthlyRevenue.map((row)=>({...row,revenue:num(row.revenue)})),
+    monthlyRevenue: monthlyRevenue.map((row)=>({...row,revenue:num(row.revenue),deliveries:num(row.deliveries)})),
     monthlyRevenueError,
     lowStockProducts,
-    notes: { revenue:'Paid gross order value in base currency; excludes cancelled/refunded statuses and is not adjusted by a refund ledger.', visitors:'Counts are visitor-days from daily-rotating hashes, not deduplicated people.' },
+    notes: { revenue:'Paid delivered order value by delivery date in base currency; returned, cancelled, unpaid and refunded orders are excluded. Returns remove that order from recognized revenue.', visitors:'Counts are visitor-days from daily-rotating hashes, not deduplicated people.' },
   };
 }

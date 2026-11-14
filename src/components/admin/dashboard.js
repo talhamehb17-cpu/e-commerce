@@ -49,8 +49,10 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
         result.monthlyRevenueError = 'The dashboard response did not include monthly revenue data.';
       }
       setData(result);
-      setDateFrom(result.from || '');
-      setDateTo(result.to || '');
+      if (!query.includes('&refresh=')) {
+        setDateFrom(result.from || '');
+        setDateTo(result.to || '');
+      }
     } catch (cause) {
       if (cause.name !== 'AbortError') setError(cause.message || 'Could not load dashboard statistics.');
     } finally {
@@ -63,6 +65,22 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
     load(requestKey, controller.signal);
     return () => controller.abort();
   }, [requestKey, load]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        setRequestKey((key) => `${key.split('&refresh=')[0]}&refresh=${Date.now()}`);
+      }
+    };
+    const timer = window.setInterval(refresh, 20_000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
 
   async function dismissNotification(id) {
     try {
@@ -147,13 +165,14 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
       )}
 
       <div className="admin-grid kpi-grid dashboard-kpis">
-        <Kpi label="Paid gross revenue · selected period" value={data?money(t.revenue):'—'} delta={data?`${percent(t.revenueGrowth)} vs previous period · not refund-adjusted`:'Data unavailable'} icon={TrendingUp} />
+        <Kpi label="Total delivered revenue · all time" value={data?money(t.revenueAll):'—'} delta="Paid delivered orders · returns excluded" icon={TrendingUp} />
+        <Kpi label="Delivered revenue · selected period" value={data?money(t.revenue):'—'} delta={data?`${percent(t.revenueGrowth)} vs previous period · by delivery date`:'Data unavailable'} icon={TrendingUp} />
         <Kpi label="Orders · all time" value={data?compact(t.orders):'—'} delta={data?`${compact(t.ordersPeriod)} placed in selected period`:'Data unavailable'} icon={Package} href="/admin/orders" />
         <Kpi label="Customers · all time" value={data?compact(t.customers):'—'} delta={data?`${compact(t.customersPeriod)} registrations in period`:'Data unavailable'} icon={Users} href="/admin/customers" />
         <Kpi label="Visitor-days" value={data?compact(t.visitorDays):'—'} delta={data?`${compact(t.pageViews)} page views · daily anonymous hashes`:'Data unavailable'} icon={Eye} />
       </div>
-      <section className="panel dashboard-revenue-panel" aria-label="Monthly revenue graph">
-        <div className="panel-head"><div><h3>Monthly revenue</h3><p className="sub">Paid gross order value grouped by order date · base-currency PKR · COD counts paid on delivery; cancelled/refunded orders excluded · not profit or refund-adjusted net revenue</p></div><span className="eyebrow">Last 12 months</span></div>
+      <section className="panel dashboard-revenue-panel" aria-label="Monthly delivered revenue graph">
+        <div className="panel-head"><div><h3>Delivered revenue</h3><p className="sub">Paid orders counted when delivered · returned orders are removed · grouped by delivery date · PKR</p></div><span className="eyebrow">Last 12 months</span></div>
         <MonthlyRevenueGraph rows={data?.monthlyRevenue||[]} error={data?.monthlyRevenueError||error} loading={loading} onRetry={() => setRequestKey((key) => `${key}&refresh=${Date.now()}`)} />
       </section>
       <div className="admin-grid dashboard-grid dashboard-grid-last">
@@ -177,29 +196,42 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
 
 function MonthlyRevenueGraph({ rows = [], error = '', loading = false, onRetry }) {
   const [hovered, setHovered] = useState(null);
+  const [metric, setMetric] = useState('revenue');
   const W=820,H=300,pad={left:78,right:22,top:20,bottom:55};
   const width=W-pad.left-pad.right,height=H-pad.top-pad.bottom;
-  const maxValue=Math.max(0,...rows.map((row)=>Number(row.revenue)||0));
+  const values=rows.map((row)=>Number(row[metric])||0);
+  const maxValue=Math.max(0,...values);
   const magnitude=maxValue>0?10**Math.floor(Math.log10(maxValue/5)):1;
   const step=Math.max(1,magnitude*Math.ceil(maxValue/5/magnitude));
   const max=step*5;
-  const points=rows.map((row,index)=>({x:pad.left+(rows.length<2?width/2:width*index/(rows.length-1)),y:pad.top+height-(Number(row.revenue||0)/max)*height,row}));
+  const points=rows.map((row,index)=>({x:pad.left+(rows.length<2?width/2:width*index/(rows.length-1)),y:pad.top+height-(Number(row[metric]||0)/max)*height,row}));
   const moneyTick=(minor)=>`Rs ${new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(minor/100)}`;
+  const tick=(value)=>metric==='revenue'?moneyTick(value):Math.round(value).toLocaleString('en-US');
+  const format=(row)=>metric==='revenue'?money(row.revenue):`${Number(row.deliveries||0).toLocaleString('en-US')} deliveries`;
   const labelIndexes=[...new Set([0,2,4,6,8,10,rows.length-1].filter((i)=>i>=0&&i<rows.length))];
   const selected=hovered==null?null:points[hovered];
+  const chartKey=`${metric}:${rows.map((row)=>`${row.month}-${row.revenue}-${row.deliveries}`).join('|')}`;
+  useEffect(()=>setHovered(null),[chartKey]);
   if(!rows.length)return <div className="dashboard-revenue-empty" role={error?'alert':'status'}>{error?<>Monthly revenue could not be loaded: {error} <button type="button" className="btn btn-outline btn-sm" onClick={onRetry} disabled={loading}>{loading?'Retrying…':'Retry revenue data'}</button></>:loading?'Loading monthly revenue…':'Monthly revenue history is unavailable.'}</div>;
-  const hasRevenue = rows.some((row)=>Number(row.revenue)>0);
+  const hasValue=values.some((value)=>value>0);
   return <div className="dashboard-revenue-chart-wrap">
-    <svg className="dashboard-revenue-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Monthly paid gross revenue line graph with month labels and PKR scale">
-      {Array.from({length:6},(_,index)=>{const y=pad.top+height-height*index/5;return <g key={index}><line x1={pad.left} x2={W-pad.right} y1={y} y2={y} className="dashboard-revenue-gridline"/><text x={pad.left-10} y={y+4} textAnchor="end" className="dashboard-revenue-axis-label">{moneyTick(max*index/5)}</text></g>})}
+    <div className="dashboard-chart-toolbar">
+      <div className="seg dashboard-chart-toggle" aria-label="Choose graph metric">
+        <button type="button" data-on={metric==='revenue'} aria-pressed={metric==='revenue'} onClick={()=>{setMetric('revenue');setHovered(null)}}>Revenue</button>
+        <button type="button" data-on={metric==='deliveries'} aria-pressed={metric==='deliveries'} onClick={()=>{setMetric('deliveries');setHovered(null)}}>Deliveries</button>
+      </div>
+      {loading&&<span className="dashboard-refresh-indicator" role="status">Updating…</span>}
+    </div>
+    <svg key={chartKey} className="dashboard-revenue-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={metric==='revenue'?'Monthly paid delivered revenue line graph with month labels and PKR scale':'Monthly delivery count line graph with month labels'}>
+      {Array.from({length:6},(_,index)=>{const y=pad.top+height-height*index/5;return <g key={index}><line x1={pad.left} x2={W-pad.right} y1={y} y2={y} className="dashboard-revenue-gridline"/><text x={pad.left-10} y={y+4} textAnchor="end" className="dashboard-revenue-axis-label">{tick(max*index/5)}</text></g>})}
       <line x1={pad.left} x2={pad.left} y1={pad.top} y2={pad.top+height} className="dashboard-revenue-axis"/>
       <line x1={pad.left} x2={W-pad.right} y1={pad.top+height} y2={pad.top+height} className="dashboard-revenue-axis"/>
       <polyline points={points.map(({x,y})=>`${x},${y}`).join(' ')} fill="none" className="dashboard-revenue-line"/>
-      {points.map(({x,y,row},index)=><circle key={row.month} cx={x} cy={y} r="4" tabIndex={0} role="graphics-symbol" aria-label={`${row.month}: ${money(row.revenue)} paid gross revenue`} className="dashboard-revenue-point" onMouseEnter={()=>setHovered(index)} onMouseLeave={()=>setHovered(null)} onFocus={()=>setHovered(index)} onBlur={()=>setHovered(null)} />)}
+      {points.map(({x,y,row},index)=><circle key={row.month} cx={x} cy={y} r="4" tabIndex={0} role="graphics-symbol" aria-label={`${row.month}: ${format(row)}`} style={{animationDelay:`${Math.min(index*35,350)}ms`}} className="dashboard-revenue-point" onMouseEnter={()=>setHovered(index)} onMouseLeave={()=>setHovered(null)} onFocus={()=>setHovered(index)} onBlur={()=>setHovered(null)} />)}
       {labelIndexes.map((index)=><g key={rows[index].month}><line x1={points[index].x} x2={points[index].x} y1={pad.top+height} y2={pad.top+height+5} className="dashboard-revenue-axis"/><text x={points[index].x} y={H-25} textAnchor="middle" className="dashboard-revenue-axis-label">{rows[index].label} ’{rows[index].month.slice(2,4)}</text></g>)}
     </svg>
-    {!hasRevenue&&<p className="dashboard-revenue-zero" role="status">No paid revenue recorded in these 12 calendar months. The graph reflects paid orders only.</p>}
-    {selected&&<div className="dashboard-revenue-tooltip" aria-live="polite"><small>{selected.row.month}</small><strong>{money(selected.row.revenue)}</strong><span>Paid gross revenue</span></div>}
+    {!hasValue&&<p className="dashboard-revenue-zero" role="status">No paid deliveries recorded in these 12 calendar months.</p>}
+    {selected&&<div className="dashboard-revenue-tooltip" aria-live="polite"><small>{selected.row.month}</small><strong>{format(selected.row)}</strong><span>{metric==='revenue'?'Net delivered revenue':'Completed paid deliveries'}</span></div>}
   </div>;
 }
 
