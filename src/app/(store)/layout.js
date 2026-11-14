@@ -1,5 +1,6 @@
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
+import { WhatsAppContact } from '@/components/whatsapp-contact';
 
 export default function StoreLayout({ children }) {
   return (
@@ -8,6 +9,7 @@ export default function StoreLayout({ children }) {
       <Header />
       <main id="main" tabIndex={-1}>{children}</main>
       <Footer />
+      <WhatsAppContact />
     </>
   );
 }

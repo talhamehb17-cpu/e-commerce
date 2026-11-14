@@ -9,7 +9,7 @@ function extent(values) {
   return { max, min };
 }
 
-export function AreaChart({ data, xKey = 'date', yKey = 'revenue', height = 220, color = 'var(--accent)', format = (v) => v, compareKey }) {
+export function AreaChart({ data, xKey = 'date', yKey = 'revenue', height = 220, color = 'var(--accent)', format = (v) => v, compareKey, ariaLabel = 'Trend chart' }) {
   const [hover, setHover] = useState(null);
   const w = 720;
   const h = height;
@@ -43,7 +43,7 @@ export function AreaChart({ data, xKey = 'date', yKey = 'revenue', height = 220,
 
   return (
     <div style={{ position: 'relative' }}>
-      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Trend chart">
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label={ariaLabel}>
         <defs>
           <linearGradient id={`grad-${yKey}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.28" />
@@ -99,10 +99,10 @@ function labelDate(v) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-export function BarChart({ data, xKey = 'date', yKey = 'orders', height = 180, format = (v) => v }) {
+export function BarChart({ data, xKey = 'date', yKey = 'orders', height = 180, format = (v) => v, ariaLabel = `${yKey} by date` }) {
   const { max } = extent(data.map((d) => Number(d[yKey]) || 0));
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height, paddingTop: 10 }}>
+    <div role="img" aria-label={ariaLabel} style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height, paddingTop: 10 }}>
       {data.map((d, i) => {
         const v = Number(d[yKey]) || 0;
         const pct = (v / max) * 100;

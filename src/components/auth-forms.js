@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -19,7 +19,36 @@ export function AuthArt({ title, subtitle }) {
   );
 }
 
-export function LoginForm() {
+export function AuthSwitcher({ initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode);
+  const switchTo = (next) => setMode(next);
+  const isLogin = mode === 'login';
+  return (
+    <div className="auth-switcher">
+      <div className="auth-mode-toggle" role="tablist" aria-label="Account access">
+        <span className="auth-mode-indicator" data-mode={mode} aria-hidden="true" />
+        <button type="button" role="tab" id="auth-tab-login" aria-selected={isLogin} aria-controls="auth-panel-login" tabIndex={isLogin ? 0 : -1} onClick={() => switchTo('login')}>Sign in</button>
+        <button type="button" role="tab" id="auth-tab-register" aria-selected={!isLogin} aria-controls="auth-panel-register" tabIndex={!isLogin ? 0 : -1} onClick={() => switchTo('register')}>Create account</button>
+      </div>
+      <div className="auth-form-stage">
+        <section id="auth-panel-login" className="auth-form-panel" data-active={isLogin} role="tabpanel" aria-labelledby="auth-tab-login" aria-hidden={!isLogin} inert={!isLogin}>
+          <div className="eyebrow">Welcome back</div>
+          <h1>Sign in</h1>
+          <p className="sub">Track orders, save items and check out faster.</p>
+          <Suspense fallback={<div className="skeleton" style={{ height: 260 }} />}><LoginForm onSwitch={() => switchTo('register')} /></Suspense>
+        </section>
+        <section id="auth-panel-register" className="auth-form-panel" data-active={!isLogin} role="tabpanel" aria-labelledby="auth-tab-register" aria-hidden={isLogin} inert={isLogin}>
+          <div className="eyebrow">Join the list</div>
+          <h1>Create account</h1>
+          <p className="sub">Faster checkout, order tracking and early access to new arrivals.</p>
+          <RegisterForm onSwitch={() => switchTo('login')} />
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export function LoginForm({ onSwitch }) {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get('next') || '/account';
@@ -72,12 +101,12 @@ export function LoginForm() {
         <Link href="/forgot-password" style={{ fontSize: 12.5, color: 'var(--accent)' }}>Forgot password?</Link>
       </div>
       <button className="btn btn-block" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-      <p className="auth-alt">New here? <Link href="/register">Create an account</Link></p>
+      <p className="auth-alt">New here? <button type="button" onClick={onSwitch}>Create an account</button></p>
     </form>
   );
 }
 
-export function RegisterForm() {
+export function RegisterForm({ onSwitch }) {
   const router = useRouter();
   const [form, setForm] = useState({ name: '', email: '', password: '', marketing: true });
   const [busy, setBusy] = useState(false);
@@ -179,7 +208,7 @@ export function RegisterForm() {
         Email me new arrivals and editor picks. One email a week.
       </label>
       <button className="btn btn-block" disabled={busy}>{busy ? 'Creating account…' : 'Create account'}</button>
-      <p className="auth-alt">Already have an account? <Link href="/login">Sign in</Link></p>
+      <p className="auth-alt">Already have an account? <button type="button" onClick={onSwitch}>Sign in</button></p>
     </form>
   );
 }

@@ -61,6 +61,12 @@ Consequences of this snapshot:
 - Blank `ADMIN_PASSWORD` does not change an existing admin credential. A build against an empty database will fail seeding until the initial admin values are provided.
 - The Vercel `NEXT_PUBLIC_SITE_URL` was set to the project's `.vercel.app` storefront URL and applied to all scopes. Verify it matches the canonical public production host you intend to use.
 
+## Release addendum
+
+During the current release, the Vercel project was configured with the plain, non-secret `DEPLOY_DB=0` variable for both **Production** and **Preview**. This is a deliberate safety guard: Vercel build hooks must not run the repository's migration, seed, and settings-sync scripts against the database shared by Preview and Production. No database schema changes are included in this release. Apply future schema/data migrations through an explicitly reviewed maintenance/deploy step; normal Vercel builds will not apply them automatically until this policy is changed.
+
+The prior inventory above records the earlier state, when `DEPLOY_DB` was absent; this addendum supersedes that status for the current Vercel project.
+
 ## Production/backend notes
 
 - The connected production deployment observed during this audit was `READY`/`PROMOTED`, running the previously deployed commit `cdb2dceedfc50ad836754bcf91965556752b2e54`. The latest cleanup preview (`5cd80ff`) also reported `READY` after its earlier `BUILDING` state. This describes Vercel deployment status only; it is not a smoke test of current production routes or a deployment of this audit.

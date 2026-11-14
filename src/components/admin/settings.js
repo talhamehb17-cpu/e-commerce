@@ -52,6 +52,8 @@ export function AdminSettings() {
   }
 
   const s = settings;
+  const whatsappDigits = String(s.store?.whatsapp || '').replace(/\D/g, '');
+  const whatsappInvalid = Boolean(whatsappDigits) && (whatsappDigits.length < 8 || whatsappDigits.length > 15);
 
   return (
     <div>
@@ -84,10 +86,10 @@ export function AdminSettings() {
           </div>
           <div className="form-row">
             <div className="field"><label>TikTok URL</label><input className="input" value={s.store.tiktok || ''} onChange={(e) => set('store', 'tiktok', e.target.value)} /></div>
-            <div className="field"><label>WhatsApp number</label><input className="input" value={s.store.whatsapp || ''} onChange={(e) => set('store', 'whatsapp', e.target.value)} /></div>
+            <div className="field"><label>WhatsApp number</label><input className="input" type="tel" inputMode="tel" autoComplete="tel" value={s.store.whatsapp || ''} onChange={(e) => set('store', 'whatsapp', e.target.value)} aria-describedby="whatsapp-number-help" /><small id="whatsapp-number-help" className="sub" style={whatsappInvalid ? { color: '#b4453a' } : undefined}>{whatsappInvalid ? 'Enter 8–15 digits including the country calling code, or clear the field.' : 'Include the country calling code. Leave blank to hide the floating contact button.'}</small></div>
           </div>
           <label className="switch" style={{ marginBottom: 14 }}><input type="checkbox" checked={Boolean(s.store.maintenance)} onChange={(e) => set('store', 'maintenance', e.target.checked)} /> Maintenance mode (hide storefront)</label>
-          <button className="btn" onClick={() => save('store')} disabled={saving}><Save size={13} /> {saving ? 'Saving…' : 'Save store details'}</button>
+          <button className="btn" onClick={() => save('store')} disabled={saving || whatsappInvalid}><Save size={13} /> {saving ? 'Saving…' : 'Save store details'}</button>
         </div>
       )}
 

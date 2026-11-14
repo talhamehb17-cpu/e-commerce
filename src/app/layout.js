@@ -8,6 +8,7 @@ import { getTheme, themeCssVars } from '@/lib/themes';
 import { sql } from '@/lib/db';
 import { StoreProvider } from '@/components/providers';
 import { ToastHost } from '@/components/toast';
+import { ThemeSwitcher } from '@/components/theme-switcher';
 import { Analytics } from '@/components/analytics';
 import { SeasonalEffects } from '@/components/seasonal-effects';
 import { PromotionPopups } from '@/components/promotion-popups';
@@ -99,11 +100,12 @@ export default async function RootLayout({ children }) {
             currency: customer?.currency || defaultCurrency,
             currencies,
             theme: { slug: theme.slug, source: resolved.source, allowOverride: themeConfig.allowOverride, allowFontOverride: themeConfig.allowFontOverride, fonts: resolved.fonts || { heading: theme.font, body: 'Inter' }, fontPersonal: Boolean(customer?.font_preference?.enabled && themeConfig.allowFontOverride), defaultSlug: themeConfig.palette, defaultFonts: themeConfig.fonts || { heading: getTheme(themeConfig.palette).font, body: 'Inter' }, themes: themeConfig.themes },
-            store: { name: store.name, tagline: store.tagline, announcement, instagram: store.instagram, facebook: store.facebook, email: store.email },
+            store: { name: store.name, tagline: store.tagline, announcement, instagram: store.instagram, facebook: store.facebook, email: store.email, whatsapp: store.whatsapp },
             catalogMeta: meta,
           }}
         >
           {children}
+          <ThemeSwitcher />
           <SeasonalEffects config={seasonal} />
           <PromotionPopups popups={promotions.popups || []} />
           <ToastHost />

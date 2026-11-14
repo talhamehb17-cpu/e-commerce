@@ -53,7 +53,7 @@ export function ThemeSwitcher() {
 
   return (
     <>
-      <button ref={openerRef} className="icon-btn" onClick={() => setOpen(true)} aria-label="Change appearance" title="Appearance"><Palette size={18} /></button>
+      <button ref={openerRef} type="button" className="icon-btn floating-theme-trigger" onClick={() => setOpen(true)} aria-label="Change appearance" title="Appearance"><Palette size={18} /></button>
       <div className="modal appearance-modal" data-appearance-dialog data-open={open} aria-hidden={!open} inert={!open} role="dialog" aria-modal="true" aria-labelledby="appearance-title">
         <div className="modal-scrim" onClick={closeDialog} />
         <div className="modal-panel appearance-panel">

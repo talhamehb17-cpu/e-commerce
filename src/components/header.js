@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { useStore } from './providers';
 import { CartDrawer, useCart } from './cart-drawer';
 import { SearchModal } from './search';
-import { ThemeSwitcher } from './theme-switcher';
 import { CurrencyFlag } from './currency-flag';
 import { Search, ShoppingBag, Heart, User, Menu, X } from './icons';
 
@@ -132,7 +131,6 @@ export function Header() {
                 </div>
               )}
             </div>
-            <ThemeSwitcher />
             <Link href={customer ? '/account/wishlist' : '/login'} className="icon-btn" aria-label="Wishlist">
               <Heart size={18} />
               {wishlistCount > 0 && <span className="badge-dot">{wishlistCount}</span>}
