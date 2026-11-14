@@ -87,6 +87,7 @@ export async function smtpStatus() {
     configured: !!(value?.host && value?.username && value?.password),
     host: value?.host || '',
     port: value?.port || 587,
+    secure: value?.secure ?? false,
     username: value?.username || '',
     sender: value?.sender || '',
     senderName: value?.senderName || 'NOVA',

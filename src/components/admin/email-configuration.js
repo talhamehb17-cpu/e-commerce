@@ -10,6 +10,18 @@ const choices=[
  ['cancellationsRefunds','Cancellations, returns and refunds'],['adminOrder','New order alerts to admin'],['accountSecurity','Account security and welcome messages'],['marketing','Marketing (only opted-in customers)'],
 ];
 
+async function readApiResponse(response){
+ const text=await response.text();
+ let data=null;
+ try{data=text?JSON.parse(text):null}catch{}
+ if(!response.ok){
+  const detail=typeof data?.error==='string'?data.error:(text||response.statusText||'Request failed').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,240);
+  throw new Error(`HTTP ${response.status}: ${detail}`);
+ }
+ if(!data||typeof data!=='object')throw new Error(`HTTP ${response.status}: server returned an unreadable response`);
+ return data;
+}
+
 export function EmailConfiguration(){
  const [v,setV]=useState(initial),[configured,setConfigured]=useState(false),[keyStatus,setKeyStatus]=useState(null),[storedConfigState,setStoredConfigState]=useState('unknown'),[loaded,setLoaded]=useState(false),[loadError,setLoadError]=useState(''),[busy,setBusy]=useState(false),[testTo,setTestTo]=useState('');
  const keyConfigured=keyStatus?.valid===true;
@@ -17,18 +29,18 @@ export function EmailConfiguration(){
   setLoadError('');
   try{
    const r=await fetch('/api/admin/email-configuration',{cache:'no-store'});
-   const d=await r.json();
-   if(!r.ok)throw new Error(d.error||`Email settings request failed (${r.status})`);
+   const d=await readApiResponse(r);
    setConfigured(!!d.smtp?.hasStoredPassword);setKeyStatus(d.keyStatus||{present:!!d.keyConfigured,valid:!!d.keyConfigured,format:d.keyConfigured?'unknown':'missing'});setStoredConfigState(d.storedConfigState||'unknown');
    setV(x=>({...x,...d.smtp,notifications:{...DEFAULT_NOTIFICATIONS,...d.smtp?.notifications},password:''}));setTestTo(d.smtp?.recipient||'');
-  }catch(e){setLoadError(e.message||'Could not verify email settings from the server.');}
+   return !!d.smtp?.hasStoredPassword;
+  }catch(e){setLoadError(e.message||'Could not verify email settings from the server.');return false;}
   finally{setLoaded(true)}
  }
  useEffect(()=>{loadSettings()},[]);
  const change=(k,value)=>setV(s=>({...s,[k]:value}));
  const toggle=(k,value)=>setV(s=>({...s,notifications:{...s.notifications,[k]:value}}));
- async function save(){setBusy(true);try{const r=await fetch('/api/admin/email-configuration',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...v,port:Number(v.port)})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not save email configuration');setConfigured(true);setV(s=>({...s,password:''}));toast('Encrypted SMTP settings and notification rules saved')}catch(e){toast(e.message,'error')}finally{setBusy(false)}}
- async function test(){setBusy(true);try{const r=await fetch('/api/admin/email-configuration/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:testTo})});const d=await r.json();if(!r.ok)throw new Error(d.error||'SMTP test send failed');toast(`SMTP accepted a test email for ${d.to}`)}catch(e){toast(e.message,'error')}finally{setBusy(false)}}
+ async function save(){setBusy(true);try{const r=await fetch('/api/admin/email-configuration',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...v,port:Number(v.port)})});const d=await readApiResponse(r);if(d.ok!==true||d.smtp?.hasStoredPassword!==true)throw new Error(`HTTP ${r.status}: server did not confirm a verified SMTP settings write`);setV(s=>({...s,password:''}));const verified=await loadSettings();if(!verified){toast(`Save was accepted, but the follow-up read did not verify the stored settings. ${d.requestId?`Reference: ${d.requestId}`:'Retry the status check.'}`,'error');return}toast('Encrypted SMTP settings and notification rules saved and verified')}catch(e){toast(e.message||'Could not save email configuration','error')}finally{setBusy(false)}}
+ async function test(){setBusy(true);try{const r=await fetch('/api/admin/email-configuration/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:testTo})});const d=await readApiResponse(r);toast(`SMTP accepted a test email for ${d.to}`)}catch(e){toast(e.message||'SMTP test send failed','error')}finally{setBusy(false)}}
  return <div className="email-config-page">
   <div className="page-head"><div><h1>Email configuration</h1><p>Owner-only SMTP transport, sender identity and transactional notification controls.</p></div><span className={`pill ${configured?'delivered':'pending'}`}>{configured?'SMTP saved':'Not configured'}</span></div>
   <div className="panel" style={{marginBottom:14}}><h3>SMTP connection</h3><p className="sub">Credentials are encrypted on the server using AES-256-GCM. Passwords are write-only, never returned to this page and never stored in browser storage.</p>{!loaded&&<p className="sub" role="status">Checking the server-side SMTP key status…</p>}{loadError&&<div role="alert" className="alert error">{loadError} <button type="button" className="btn btn-outline btn-sm" onClick={loadSettings}>Retry status check</button></div>}{loaded&&!loadError&&!keyConfigured&&<p role="alert" className="alert error">{keyStatus?.present?'SMTP_CREDENTIALS_KEY is available to the server but has an invalid format. Use 32-byte Base64 or 64 hexadecimal characters.':'The SMTP key is not available to this deployment runtime. The key name is exact: SMTP_CREDENTIALS_KEY. Project metadata is not enough; this server function did not receive a value.'}</p>}{loaded&&keyConfigured&&storedConfigState==='unreadable'&&<p role="alert" className="alert error">Existing encrypted SMTP settings could not be decrypted with the configured key. They have not been overwritten. Restore the original key before changing credentials.</p>}

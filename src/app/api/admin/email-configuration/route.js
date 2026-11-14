@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { guard, audit } from '@/lib/admin';
 import { fail, json } from '@/lib/api';
@@ -27,6 +28,14 @@ async function owner() {
   return result;
 }
 
+function safeErrorStack(error, secrets = []) {
+  let stack = typeof error?.stack === 'string' ? error.stack : `${error?.name || 'Error'}: ${error?.message || 'unknown error'}`;
+  for (const secret of secrets) {
+    if (typeof secret === 'string' && secret.length) stack = stack.replaceAll(secret, '[redacted]');
+  }
+  return stack.slice(0, 6000);
+}
+
 export async function GET() {
   const access = await owner();
   if (access.error) return fail(access.error, access.status);
@@ -47,52 +56,79 @@ export async function GET() {
 }
 
 export async function PUT(request) {
-  const access = await owner();
-  if (access.error) return fail(access.error, access.status);
-  if (!rateLimit(`smtp-save:${access.admin.id}`, 5, 60_000).ok) return fail('Too many email configuration changes. Try again later.',429);
-
-  const key = smtpKeyStatus();
-  if (!key.valid) {
-    return fail(key.present
-      ? 'SMTP_CREDENTIALS_KEY is visible to the server but is not valid 32-byte Base64 or 64-character hexadecimal.'
-      : 'SMTP_CREDENTIALS_KEY is not available to this server runtime. Confirm the Vercel project/environment and deploy after setting it.', 503);
-  }
-
+  const requestId = randomUUID();
+  let phase = 'authorization';
   let body;
-  try { body = await request.json(); } catch { return fail('Invalid JSON body',400); }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) return fail(parsed.error.issues[0].message,422);
-
   let stored;
-  try { stored = await readSmtpConfigState(); }
-  catch (error) {
-    console.error('SMTP credential state could not be read before save:', error?.message || 'unknown error');
-    return fail('Stored email settings could not be read; no changes were saved. Retry after database connectivity is restored.',503);
-  }
-  if (stored.state === 'unreadable') {
-    return fail('Existing encrypted SMTP settings cannot be decrypted with the current key. They were left unchanged; restore the original key before saving.',409);
-  }
+  const responseFail = (message, status) => fail(message, status, { requestId });
 
-  const previous = stored.config;
-  const d = parsed.data;
-  if (!d.password && !previous?.password) return fail('Enter the SMTP password to configure delivery.',422);
-  const value = {
-    ...d,
-    senderName:d.senderName || 'NOVA',
-    replyTo:d.replyTo || '',
-    notifications:d.notifications || previous?.notifications || {},
-    password:d.password || previous.password,
-  };
-  try { await saveSmtpConfig(value); }
-  catch (error) {
-    // Internal logs intentionally contain only a generic diagnostic, never input or key values.
-    console.error('SMTP settings save or encryption read-back verification failed:', error?.message || 'unknown error');
-    return fail('Could not securely save and verify SMTP settings. No credential was returned to the browser.',503);
-  }
+  try {
+    const access = await owner();
+    if (access.error) return responseFail(access.error, access.status);
 
-  await audit(access.admin,'smtp_configuration_updated','settings','smtp_config',{host:d.host,port:d.port,username:d.username,recipient:d.recipient,orderNotifications:d.orderNotifications});
-  return json({ok:true,smtp:{
-    host:d.host,port:d.port,username:d.username,sender:d.sender,senderName:value.senderName,replyTo:value.replyTo,
-    recipient:d.recipient,orderNotifications:d.orderNotifications,notifications:value.notifications,hasStoredPassword:true,
-  }});
+    phase = 'rate-limit';
+    if (!rateLimit(`smtp-save:${access.admin.id}`, 5, 60_000).ok) {
+      return responseFail('Too many email configuration changes. Try again later.', 429);
+    }
+
+    phase = 'encryption-key-check';
+    const key = smtpKeyStatus();
+    if (!key.valid) {
+      return responseFail(key.present
+        ? 'SMTP_CREDENTIALS_KEY is visible to the server but is not valid 32-byte Base64 or 64-character hexadecimal.'
+        : 'SMTP_CREDENTIALS_KEY is not available to this server runtime. Confirm the Vercel project/environment and deploy after setting it.', 503);
+    }
+
+    phase = 'request-body';
+    try { body = await request.json(); }
+    catch { return responseFail('Invalid JSON body.', 400); }
+
+    phase = 'request-validation';
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) return responseFail(parsed.error.issues[0].message, 422);
+
+    phase = 'read-existing-settings';
+    try { stored = await readSmtpConfigState(); }
+    catch (error) {
+      console.error(JSON.stringify({ event: 'email_config_put_failure', requestId, phase, stack: safeErrorStack(error, [body?.password, process.env.SMTP_CREDENTIALS_KEY]) }));
+      return responseFail('Stored email settings could not be read; no changes were saved. Retry after database connectivity is restored.', 503);
+    }
+    if (stored.state === 'unreadable') {
+      return responseFail('Existing encrypted SMTP settings cannot be decrypted with the current key. They were left unchanged; restore the original key before saving.', 409);
+    }
+
+    const previous = stored.config;
+    const d = parsed.data;
+    if (!d.password && !previous?.password) return responseFail('Enter the SMTP password to configure delivery.', 422);
+    const value = {
+      ...d,
+      senderName:d.senderName || 'NOVA',
+      replyTo:d.replyTo || '',
+      notifications:d.notifications || previous?.notifications || {},
+      password:d.password || previous.password,
+    };
+
+    phase = 'encrypt-and-persist';
+    try { await saveSmtpConfig(value); }
+    catch (error) {
+      console.error(JSON.stringify({ event: 'email_config_put_failure', requestId, phase, stack: safeErrorStack(error, [body?.password, previous?.password, process.env.SMTP_CREDENTIALS_KEY]) }));
+      return responseFail('Could not securely save and verify SMTP settings. No credential was returned to the browser.', 503);
+    }
+
+    phase = 'audit';
+    await audit(access.admin,'smtp_configuration_updated','settings','smtp_config',{host:d.host,port:d.port,username:d.username,recipient:d.recipient,orderNotifications:d.orderNotifications});
+
+    return json({ok:true,requestId,smtp:{
+      host:d.host,port:d.port,secure:d.secure,username:d.username,sender:d.sender,senderName:value.senderName,replyTo:value.replyTo,
+      recipient:d.recipient,orderNotifications:d.orderNotifications,notifications:value.notifications,hasStoredPassword:true,
+    }});
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'email_config_put_unhandled_failure',
+      requestId,
+      phase,
+      stack: safeErrorStack(error, [body?.password, stored?.config?.password, process.env.SMTP_CREDENTIALS_KEY]),
+    }));
+    return responseFail(`Email settings request failed unexpectedly. Reference: ${requestId}.`, 500);
+  }
 }
