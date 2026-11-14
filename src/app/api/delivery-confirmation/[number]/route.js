@@ -1,4 +1,4 @@
-import { sql, invalidate } from '@/lib/db';
+import { sql, invalidate, rateLimit } from '@/lib/db';
 import { fail, json } from '@/lib/api';
 import { getCurrentCustomer } from '@/lib/auth';
 import { sendMail, templates } from '@/lib/email';
@@ -21,6 +21,7 @@ export async function GET(_request, { params }) {
 export async function POST(request, { params }) {
   const customer = await getCurrentCustomer();
   if (!customer) return fail('Sign in to confirm delivery.', 401);
+  if(!rateLimit(`delivery-answer:${customer.id}`,12,60_000).ok)return fail('Too many delivery responses. Wait a moment and retry.',429);
   const { number } = await params;
   let body;
   try { body = await request.json(); } catch { return fail('Invalid request.', 400); }

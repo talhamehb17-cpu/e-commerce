@@ -12,6 +12,7 @@ export function DeliveryNotifications() {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState(null);
+  const [nextDueAt,setNextDueAt]=useState(null);
   const active=queue[0]||null;
 
   const customerId=store?.customer?.id;
@@ -27,6 +28,7 @@ export function DeliveryNotifications() {
       if(!response.ok)throw new Error('Delivery reminders will retry automatically.');
       const data=await response.json();
       if(customerIdRef.current!==requestedCustomerId)return;
+      setNextDueAt(data.nextDueAt||null);
       if(data.notifications?.length){
         setQueue(current=>{
           const have=new Set(current.map(item=>item.id));
@@ -47,6 +49,13 @@ export function DeliveryNotifications() {
     document.addEventListener('visibilitychange',onVisible);
     return()=>{clearInterval(timer);window.removeEventListener('online',onOnline);document.removeEventListener('visibilitychange',onVisible);};
   },[poll,customerId]);
+
+  useEffect(()=>{
+    if(!customerId||!nextDueAt)return;
+    const delay=Math.max(0,Date.parse(nextDueAt)-Date.now());
+    const timer=window.setTimeout(()=>{if(document.visibilityState==='visible')poll()},delay);
+    return()=>window.clearTimeout(timer);
+  },[customerId,nextDueAt,poll]);
 
   async function answer(response){
     if(!active||busy)return;

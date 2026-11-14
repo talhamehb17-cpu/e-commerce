@@ -1,4 +1,4 @@
-import { sql } from '@/lib/db';
+import { sql, rateLimit } from '@/lib/db';
 import { fail, json } from '@/lib/api';
 import { getCurrentCustomer } from '@/lib/auth';
 
@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const customer = await getCurrentCustomer();
   if (!customer) return fail('Sign in to view delivery confirmations.', 401);
+  if(!rateLimit(`delivery-queue:${customer.id}`,30,60_000).ok)return fail('Delivery reminder checks are temporarily rate limited.',429);
   try {
     const due = await sql`
       with candidates as (
@@ -36,7 +37,10 @@ export async function GET() {
       group by o.id,o.order_number,o.status,c.due_at
       order by c.due_at, o.order_number
     `;
-    return json({ notifications: due });
+    const upcoming=await sql`select min(dc.due_at) as next_due_at from delivery_confirmations dc
+      join orders o on o.id=dc.order_id where dc.customer_id=${customer.id} and dc.state='pending'
+        and dc.due_at>now() and o.status='out_for_delivery'`;
+    return json({ notifications: due, nextDueAt: upcoming[0]?.next_due_at || null });
   } catch (error) {
     console.error('Delivery notification queue read failed:', error?.message || 'unknown error');
     return fail('Delivery reminders are temporarily unavailable. We will retry automatically.', 503);
