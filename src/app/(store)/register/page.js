@@ -14,7 +14,7 @@ export default async function RegisterPage() {
           <AuthSwitcher initialMode="register" />
         </div>
       </div>
-      <AuthArt title="Worth keeping." subtitle="Two-year quality promise, 30-day returns and free delivery over Rs 15,000." />
+      <AuthArt initialMode="register" title="Everything, considered." subtitle="Keep your favourites and order details together in one place." />
     </div>
   );
 }

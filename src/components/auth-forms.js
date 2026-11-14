@@ -7,21 +7,34 @@ import { toast } from './toast';
 import { useStore } from './providers';
 import { Eye, EyeOff } from './icons';
 
-export function AuthArt({ title, subtitle }) {
+export function AuthArt({ title, subtitle, initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode);
+  useEffect(() => {
+    const onModeChange = (event) => setMode(event.detail === 'register' ? 'register' : 'login');
+    window.addEventListener('nova-auth-mode', onModeChange);
+    return () => window.removeEventListener('nova-auth-mode', onModeChange);
+  }, []);
+  const art = mode === 'register'
+    ? { title: 'Make it yours.', subtitle: 'Create an account to save favourites and keep your orders together.' }
+    : { title, subtitle };
   return (
-    <div className="auth-art">
-      <Image src="/images/hero/hero-main.jpg" alt="" fill priority sizes="50vw" style={{ objectFit: 'cover' }} />
-      <div className="auth-art-cap">
-        <h3>{title}</h3>
-        <p>{subtitle}</p>
+    <aside className="auth-art" data-mode={mode} aria-live="polite">
+      <Image className="auth-art-image" data-visible={mode === 'login'} src="/images/hero/hero-main.jpg" alt="" fill priority sizes="(max-width: 760px) 100vw, 50vw" />
+      <Image className="auth-art-image" data-visible={mode === 'register'} src="/images/hero/hero-side.jpg" alt="" fill sizes="(max-width: 760px) 100vw, 50vw" />
+      <div className="auth-art-cap" key={mode}>
+        <h3>{art.title}</h3>
+        <p>{art.subtitle}</p>
       </div>
-    </div>
+    </aside>
   );
 }
 
 export function AuthSwitcher({ initialMode = 'login' }) {
   const [mode, setMode] = useState(initialMode);
-  const switchTo = (next) => setMode(next);
+  const switchTo = (next) => {
+    setMode(next);
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nova-auth-mode', { detail: next }));
+  };
   const isLogin = mode === 'login';
   return (
     <div className="auth-switcher">

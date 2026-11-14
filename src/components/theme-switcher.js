@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useStore, applyPalette } from './providers';
+import { useStore } from './providers';
 import { Palette, X, Check } from './icons';
 import { FONT_OPTIONS, DEFAULT_FONTS } from '@/lib/typography';
 
@@ -43,12 +43,6 @@ export function ThemeSwitcher() {
     };
   }, [open]);
 
-  useEffect(() => {
-    if (customer) return;
-    const saved = localStorage.getItem('nova_theme');
-    if (saved && saved !== theme.slug) applyPalette(saved);
-  }, [customer, theme.slug]);
-
   if (!theme.allowOverride) return null;
 
   return (
@@ -60,7 +54,7 @@ export function ThemeSwitcher() {
           <div className="appearance-dialog-head">
             <div>
               <div className="eyebrow">Appearance</div>
-              <h3 id="appearance-title">Choose your palette</h3>
+              <h3 id="appearance-title">Choose your style</h3>
             </div>
             <button ref={closeRef} className="icon-btn appearance-close" onClick={closeDialog} aria-label="Close appearance dialog"><X size={20} /></button>
           </div>
@@ -103,7 +97,7 @@ export function ThemeSwitcher() {
                 {theme.fontPersonal && <button className="btn btn-ghost btn-sm" onClick={() => setFonts(theme.defaultFonts || DEFAULT_FONTS,false)}>Use store typography</button>}
               </div>
             )}
-            {customer && theme.source === 'customer' && (
+            {theme.source === 'customer' && (
               <button className="btn btn-outline btn-block btn-sm" style={{ marginTop: 14 }} onClick={async () => { await setTheme(null); closeDialog(); }}>
                 Reset to store default
               </button>

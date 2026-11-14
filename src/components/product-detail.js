@@ -24,12 +24,14 @@ export function ProductDetail({ product, related, saved: initiallySaved, custome
   const optionGroups = groupVariants(product.variants);
   const [selection, setSelection] = useState(() => {
     const init = {};
-    optionGroups.forEach((g) => { init[g.name] = g.options[0]?.name; });
+    optionGroups.forEach((g) => { init[g.name] = (g.options.find((option) => option.stock > 0) || g.options[0])?.name; });
     return init;
   });
 
   const chosenVariant = product.variants.length
-    ? product.variants.find((v) => v.name === selection[Object.keys(selection)[0]]) || product.variants[0]
+    ? product.variants.find((variant) => variant.name === selection[variant.optionName || 'Option'])
+      || product.variants.find((variant) => variant.stock > 0)
+      || product.variants[0]
     : null;
 
   const price = product.price + (chosenVariant?.priceDelta || 0);

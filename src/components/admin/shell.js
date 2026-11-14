@@ -61,6 +61,7 @@ export function AdminShell({ admin, adminAccess = {}, badges = {}, children }) {
 
   return (
     <div className="admin-root" data-menu={open}>
+      <a href="#admin-main" className="skip-link">Skip to dashboard</a>
       <aside className="admin-side">
         <div className="admin-brand">
           <span className="logo" style={{ fontSize: 18, letterSpacing: '.28em' }}>NOVA</span>
@@ -107,7 +108,7 @@ export function AdminShell({ admin, adminAccess = {}, badges = {}, children }) {
             <Store size={13} /> Storefront
           </Link>
         </header>
-        <div className="admin-content">{children}</div>
+        <div id="admin-main" className="admin-content" tabIndex={-1}>{children}</div>
       </div>
 
       {open && <div className="admin-scrim" onClick={() => setOpen(false)} />}

@@ -237,25 +237,8 @@ async function main() {
       }
     }
 
-    const vCount = await sql`select count(*)::int n from product_variants where product_id = ${id}`;
-    if (vCount[0].n === 0) {
-      const variantSets = {
-        fashion: ['XS', 'S', 'M', 'L', 'XL'],
-        shoes: ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10'],
-        bags: ['One size'],
-        electronics: ['Black', 'Sand', 'Forest'],
-        home: ['Natural', 'Charcoal'],
-        beauty: ['30ml', '50ml', '100ml'],
-        sports: ['Standard'],
-      };
-      const opts = variantSets[cat] || ['Standard'];
-      if (opts.length > 1) {
-        for (let k = 0; k < opts.length; k++) {
-          await sql`insert into product_variants (product_id, name, option_name, price_delta, stock, position)
-            values (${id}, ${opts[k]}, ${cat === 'fashion' || cat === 'shoes' ? 'Size' : 'Colour'}, 0, ${Math.max(2, Math.floor(stock / opts.length))}, ${k})`;
-        }
-      }
-    }
+    // Product variants are intentionally not synthesized from category templates.
+    // Add only verified size/colour/volume/stock data through the admin product editor.
   }
 
   // collections

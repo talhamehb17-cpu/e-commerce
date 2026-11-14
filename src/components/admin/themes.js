@@ -77,9 +77,9 @@ export function AdminThemes() {
         {palettes.map((t) => {
           const c = colorsOf(t);
           return <article key={t.slug} className="theme-card-v2" data-selected={t.slug === selected} data-active={t.slug === current}>
-            <button type="button" className="theme-card-preview" onClick={() => { setSelected(t.slug); setFonts({heading:t.font || 'Inter',body:'Inter'}); }} aria-label={`Preview ${t.name}`} style={{ background: c.bg, color: c.ink }}>
-              <div className="theme-mini-nav" style={{ background: c.surface, borderColor: c.line }}><b style={{ fontFamily: t.font === 'Cormorant' ? 'var(--serif)' : 'var(--sans)' }}>NOVA</b><span style={{ background: c.accent, color: c.accentInk }}>SHOP</span></div>
-              <div className="theme-mini-copy"><span style={{ color: c.muted }}>CURATED FOR EVERYDAY</span><strong style={{ fontFamily: t.font === 'Cormorant' ? 'var(--serif)' : 'var(--sans)' }}>Made to matter.</strong><i style={{ background: c.accent }} /></div>
+            <button type="button" className="theme-card-preview" data-style={t.style || 'editorial'} onClick={() => { setSelected(t.slug); setFonts({heading:t.font || 'Inter',body:'Inter'}); }} aria-label={`Preview ${t.name}`} style={{ background: c.bg, color: c.ink }}>
+              <div className="theme-mini-nav" style={{ background: c.surface, borderColor: c.line }}><b style={{ fontFamily: `'${t.font || 'Inter'}', Georgia, serif` }}>NOVA</b><span style={{ background: c.accent, color: c.accentInk }}>SHOP</span></div>
+              <div className="theme-mini-copy"><span style={{ color: c.muted }}>CURATED FOR EVERYDAY</span><strong style={{ fontFamily: `'${t.font || 'Inter'}', Georgia, serif` }}>Made to matter.</strong><i style={{ background: c.accent }} /></div>
               <div className="theme-mini-product" style={{ background: `linear-gradient(140deg, ${c.surface2}, ${c.accentSoft})`, borderColor: c.line }}><span style={{ background: c.accent, color: c.accentInk }}>−20%</span><b style={{ color: c.ink }}>◒</b></div>
               <div className="theme-mini-review" style={{ background: c.surface, borderColor: c.line, color: c.ink }}><span style={{ color: c.accent }}>★★★★★</span><small style={{ color: c.muted }}>Thoughtfully made. ★ verified</small></div>
               <div className="theme-swatches">{[c.accent,c.accentSoft,c.bg,c.surface,c.ink].map((color,i)=><i key={i} style={{background:color,borderColor:c.line}} />)}</div>
@@ -95,7 +95,7 @@ export function AdminThemes() {
 
 function ThemeMock({ theme, fonts }) {
   const c = theme.colors || {};
-  return <div className="theme-live-mock" style={{background:c.bg,color:c.ink,borderColor:c.line}}>
+  return <div className="theme-live-mock" data-style={theme.style || 'editorial'} style={{background:c.bg,color:c.ink,borderColor:c.line}}>
     <div className="theme-live-top" style={{background:c.surface,borderColor:c.line}}><b>NOVA</b><span>New season</span><span>Collections</span><span>Account</span><button style={{background:c.accent,color:c.accentInk}}>Shop now</button></div>
     <div className="theme-live-body"><div><small style={{color:c.muted}}>THE CONSIDERED EDIT</small><h2 style={{fontFamily:`'${fonts.heading}', Georgia, serif`}}>Everything, considered.</h2><p style={{color:c.muted}}>A preview of the theme's typography, surfaces, product cards and buttons.</p><button style={{background:c.accent,color:c.accentInk}}>Discover the edit</button></div><div className="theme-live-tile" style={{background:`linear-gradient(145deg,${c.surface2},${c.accentSoft})`,borderColor:c.line}}><span style={{background:c.surface,color:c.ink}}>NOVA / OBJECTS</span></div></div>
   </div>;

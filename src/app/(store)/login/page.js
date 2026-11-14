@@ -14,7 +14,7 @@ export default async function LoginPage() {
           <AuthSwitcher initialMode="login" />
         </div>
       </div>
-      <AuthArt title="Everything, considered." subtitle="One account for orders across electronics, wardrobe, home and everyday carry." />
+      <AuthArt initialMode="login" title="Everything, considered." subtitle="Sign in to revisit saved items and review your orders." />
     </div>
   );
 }

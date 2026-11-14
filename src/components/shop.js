@@ -47,11 +47,11 @@ export function QuickView({ product, open, onClose, openCart }) {
       <div className="modal-scrim" onClick={onClose} />
       <div className="modal-panel">
         <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: 12, right: 12, zIndex: 3 }}><X size={18} /></button>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-          <div style={{ position: 'relative', aspectRatio: '4/5', background: 'var(--surface2)', borderRadius: '22px 0 0 22px', overflow: 'hidden' }}>
+        <div className="quick-view-layout">
+          <div className="quick-view-image">
             <Image src={product.image} alt={product.name} fill sizes="430px" style={{ objectFit: 'cover' }} />
           </div>
-          <div style={{ padding: 30 }}>
+          <div className="quick-view-info">
             <div className="eyebrow">{product.brandName || product.categoryName}</div>
             <h3 style={{ fontSize: 28, margin: '8px 0 10px' }}>{product.name}</h3>
             <Stars rating={product.rating} count={product.ratingCount} />

@@ -99,6 +99,28 @@ export function StoreProvider({ initial, children }) {
     setState((s) => ({ ...s, theme: { ...s.theme, ...nextTheme } }));
   }, [initial?.theme?.slug, initial?.theme?.fonts?.heading, initial?.theme?.fonts?.body]); // eslint-disable-line
 
+  // Guest appearance choices are browser-local. Authenticated customers use
+  // their saved account preference or the store default, never stale guest state.
+  useEffect(() => {
+    if (state.customer || !state.theme.allowOverride || initial?.theme?.source === 'customer') return;
+    try {
+      const saved = localStorage.getItem('nova_theme');
+      const available = state.theme.themes?.some((item) => item.slug === saved);
+      if (!saved || !available) return;
+      let fonts = state.theme.fonts;
+      let fontPersonal = false;
+      if (state.theme.allowFontOverride) {
+        const savedFonts = JSON.parse(localStorage.getItem('nova_fonts') || 'null');
+        if (savedFonts?.enabled && savedFonts.heading && savedFonts.body) {
+          fonts = { heading: savedFonts.heading, body: savedFonts.body };
+          fontPersonal = true;
+        }
+      }
+      applyPalette(saved, fonts);
+      setState((s) => ({ ...s, theme: { ...s.theme, slug: saved, fonts, fontPersonal, source: 'customer' } }));
+    } catch { /* Ignore malformed or unavailable browser preferences. */ }
+  }, [state.customer, initial?.theme?.source, state.theme.allowOverride, state.theme.allowFontOverride, state.theme.themes]);
+
   useEffect(() => {
     if (state.customer) return;
     const saved = typeof window !== 'undefined' && localStorage.getItem('nova_currency');
