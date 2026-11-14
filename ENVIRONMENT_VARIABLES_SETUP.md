@@ -22,7 +22,8 @@ This inventory was checked against direct source references, scripts, `.env.exam
 | `SMTP_HOST` | SMTP server hostname (`src/lib/email.js`). | Part of the required SMTP trio; no default. | Hostname; server-side, non-secret. | Vercel production and any preview/dev environment where email flows are to be tested. |
 | `SMTP_PORT` | SMTP server port; enables TLS when set to `465`. | Optional; defaults to `587`. | Port; server-side, non-secret. | Same environments as SMTP. |
 | `SMTP_USER` | SMTP authentication username. | Part of the required SMTP trio; no default. | Usually an email address; server-side. Treat as sensitive account information. | Same environments as SMTP. |
-| `SMTP_PASS` | SMTP authentication credential. | Part of the required SMTP trio; without it, production email verification/recovery is unavailable. | Secret; encrypted/sensitive. | Same environments as SMTP. |
+| `SMTP_PASS` | SMTP authentication credential for the legacy environment-based transport. | Required only when no encrypted owner-managed SMTP configuration is saved. | Secret; encrypted/sensitive. | Same environments as SMTP. |
+| `SMTP_CREDENTIALS_KEY` | Dedicated AES-256-GCM key to encrypt owner-managed SMTP credentials at rest (`src/lib/smtp-settings.js`). | Required to save SMTP credentials in Admin → Email Configuration; 32 raw bytes encoded as base64 or 64 hex characters. | Secret; never `NEXT_PUBLIC_`; use a separately generated key, not the SMTP password. | Vercel Production and any Preview/Development environment where owner-managed SMTP settings are used. |
 | `MAIL_FROM_NAME` | Default sender display name for templates (`src/lib/email.js`). | Optional; defaults to `NOVA`; DB email settings can override. | Public-facing label; server-side. | Any environment sending email. |
 | `MAIL_FROM_EMAIL` | Fallback sender address; DB email settings can override it. | Optional; fallback is `SMTP_USER`. Must be permitted by the SMTP provider. | Public-facing address; server-side. | Any environment sending email. |
 | `ORDER_NOTIFICATION_EMAIL` | Admin order notifications and fallback contact recipient. | Optional; contact API falls back to the configured store email. Checkout admin notification is sent only when this is set and notifications are enabled in store settings. | Email address; server-side, non-secret. | Environments that should receive order/contact notifications. |
@@ -66,6 +67,16 @@ Consequences of this snapshot:
 During the current release, the Vercel project was configured with the plain, non-secret `DEPLOY_DB=0` variable for both **Production** and **Preview**. This is a deliberate safety guard: Vercel build hooks must not run the repository's migration, seed, and settings-sync scripts against the database shared by Preview and Production. No database schema changes are included in this release. Apply future schema/data migrations through an explicitly reviewed maintenance/deploy step; normal Vercel builds will not apply them automatically until this policy is changed.
 
 The prior inventory above records the earlier state, when `DEPLOY_DB` was absent; this addendum supersedes that status for the current Vercel project.
+
+## Analytics / encrypted SMTP release notes (2026-11-13)
+
+This branch adds an additive `analytics_events` table and indexes in `scripts/schema.sql`. The current Vercel policy keeps `DEPLOY_DB=0`, so normal deploy builds skip migration, seeding, and settings synchronization. No production database query or mutation was performed in this release. Until an explicitly approved migration runs, the analytics API falls back gracefully and labels funnel-event storage unavailable; add-to-cart, checkout, and purchase event writes are best-effort and will not be retained. Existing order/page-view reports continue to use the current schema.
+
+Owner-managed SMTP settings are stored as an AES-256-GCM ciphertext under the existing `settings` table key `smtp_config`; the separate server-side `SMTP_CREDENTIALS_KEY` must be configured before saving credentials. Suggested generation command (run in a trusted secret manager/shell, and do not paste the output into chat or commit it): `openssl rand -base64 32`. Set the value only in the server environment(s) where owner-managed SMTP is needed. It is not currently configured by this code change. The SMTP configuration page remains unable to save until that key is set. Existing SMTP environment variables remain the fallback transport.
+
+Dependency audit found the Next.js-pinned PostCSS `8.4.31` in an affected range; `package.json` now overrides PostCSS to `^8.5.33`. The lockfile installs `8.5.33`, `npm audit` reports zero vulnerabilities, and the production build passes with the override.
+
+No production release, database migration, SMTP credential save, or SMTP delivery test was performed as part of this branch work.
 
 ## Production/backend notes
 

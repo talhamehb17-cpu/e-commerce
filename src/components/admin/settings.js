@@ -62,7 +62,7 @@ export function AdminSettings() {
       </div>
 
       <div className="tabs">
-        {TABS.map(([k, label, Icon]) => (
+        {TABS.filter(([k]) => k !== 'email' || meta.isOwner).map(([k, label, Icon]) => (
           <button key={k} data-on={tab === k ? 'true' : 'false'} onClick={() => setTab(k)}><Icon size={13} /> {label}</button>
         ))}
       </div>
@@ -200,10 +200,10 @@ export function AdminSettings() {
           <div className="panel-head"><h3><ShieldCheck size={15} /> Connection status</h3></div>
           <div className="summary-row"><span>Database</span><span style={{ fontFamily: 'monospace', fontSize: 11 }}>{meta.dbHost || '—'}</span></div>
           <div className="summary-row"><span>Object storage</span><span className={`pill ${meta.storageConfigured ? 'delivered' : 'pending'}`}>{meta.storageConfigured ? 'Connected' : 'Not configured'}</span></div>
-          <div className="summary-row"><span>SMTP</span><span className={`pill ${meta.emailConfigured ? 'delivered' : 'pending'}`}>{meta.emailConfigured ? 'Connected' : 'Not configured'}</span></div>
+          {meta.isOwner && <div className="summary-row"><span>SMTP</span><span className={`pill ${meta.emailConfigured ? 'delivered' : 'pending'}`}>{meta.emailConfigured ? 'Connected' : 'Not configured'}</span></div>}
           <div className="summary-row"><span>Base currency</span><span>{s.currency.default} (rates auto-refresh: {s.currency.auto_update ? 'on' : 'off'})</span></div>
           <p className="sub" style={{ fontSize: 11.5, marginTop: 12 }}>
-            Secrets are read from environment variables only — they are never written to the database or sent to the browser.
+            SMTP credentials are encrypted server-side and never sent to the browser. Configure the dedicated SMTP_CREDENTIALS_KEY on the server.
           </p>
         </div>
       )}

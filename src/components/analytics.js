@@ -8,12 +8,7 @@ export function Analytics({ enabled }) {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;
     if (pathname.startsWith('/admin')) return;
-    let visitor = localStorage.getItem('nova_vid');
-    if (!visitor) {
-      visitor = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      localStorage.setItem('nova_vid', visitor);
-    }
-    const body = JSON.stringify({ path: pathname, visitor, referrer: document.referrer || '' });
+    const body = JSON.stringify({ path: pathname, referrer: document.referrer || '' });
     if (navigator.sendBeacon) {
       navigator.sendBeacon('/api/track', new Blob([body], { type: 'application/json' }));
     } else {

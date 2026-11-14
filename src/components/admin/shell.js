@@ -7,12 +7,13 @@ import { toast } from '../toast';
 import {
   LayoutDashboard, Boxes, Package, Tag, Users, MessageSquare, Ticket, ImageIcon,
   Palette, Coins, Settings, ClipboardList, User as UserIcon, LogOut, Menu, X, Store, ExternalLink,
-  BarChart3, Layers, Grid2x2, ShieldCheck,
+  BarChart3, Layers, Grid2x2, ShieldCheck, Mail,
 } from '../icons';
 
 const NAV = [
   { group: 'Overview', items: [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/orders', label: 'Orders', icon: Package, badgeKey: 'orders' },
     { href: '/admin/customers', label: 'Customers', icon: Users },
   ]},
@@ -32,6 +33,7 @@ const NAV = [
   { group: 'Settings', items: [
     { href: '/admin/currencies', label: 'Currencies', icon: Coins },
     { href: '/admin/settings', label: 'Store settings', icon: Settings },
+    { href: '/admin/email', label: 'Email configuration', icon: Mail },
     { href: '/admin/team', label: 'Team & access', icon: ShieldCheck },
     { href: '/admin/profile', label: 'My account', icon: UserIcon },
   ]},
@@ -43,11 +45,13 @@ export function AdminShell({ admin, adminAccess = {}, badges = {}, children }) {
   const [open, setOpen] = useState(false);
   const accessFor = (href) => {
     if (href === '/admin') return true;
+    if (href.startsWith('/admin/analytics')) return adminAccess.analytics;
     if (href.startsWith('/admin/orders')) return adminAccess.orders;
     if (href.startsWith('/admin/customers')) return adminAccess.customers;
     if (href.startsWith('/admin/products') || href.startsWith('/admin/inventory') || href.startsWith('/admin/categories') || href.startsWith('/admin/brands') || href.startsWith('/admin/collections')) return adminAccess.products;
     if (href.startsWith('/admin/reviews')) return adminAccess.reviews;
     if (href.startsWith('/admin/content') || href.startsWith('/admin/themes')) return adminAccess.content;
+    if (href.startsWith('/admin/email')) return adminAccess.ownerEmail;
     if (href.startsWith('/admin/discounts') || href.startsWith('/admin/currencies') || href.startsWith('/admin/settings') || href.startsWith('/admin/team')) return adminAccess.settings;
     return true;
   };

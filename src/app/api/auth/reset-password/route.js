@@ -14,7 +14,7 @@ export async function POST(request) {
   const rows = await sql`update customers set password_hash = ${hashPassword(data.password)}, updated_at = now() where email = ${data.email} returning id, name`;
   if (!rows[0]) return fail('Account not found', 404);
   await sql`update sessions set revoked_at = now() where subject_type = 'customer' and subject_id = ${rows[0].id} and revoked_at is null`;
-  if (emailConfigured()) {
+  if (await emailConfigured()) {
     const tpl = templates.password_changed({ name: rows[0].name });
     await sendMail({ to: data.email, subject: tpl.subject, html: tpl.html, template: 'password_changed', customerId: rows[0].id });
   }

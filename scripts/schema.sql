@@ -463,3 +463,17 @@ alter table newsletter_subscribers add column if not exists unsubscribed_at time
 alter table page_views add column if not exists visitor_hash text;
 create index if not exists idx_page_views_created on page_views(created_at);
 create index if not exists idx_page_views_visitor on page_views(visitor_hash);
+
+-- First-party, PII-minimized commerce events. Visitor identifiers are server-hashed and daily-rotated.
+create table if not exists analytics_events (
+  id bigserial primary key,
+  event_type text not null,
+  visitor_hash text not null,
+  product_id uuid references products(id) on delete set null,
+  order_id uuid references orders(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_analytics_events_created_type on analytics_events(created_at desc, event_type);
+create index if not exists idx_analytics_events_visitor on analytics_events(visitor_hash, created_at desc);
+create index if not exists idx_orders_payment_placed on orders(payment_status, placed_at desc);
+create index if not exists idx_orders_campaign_placed on orders(coupon_code, placed_at desc);

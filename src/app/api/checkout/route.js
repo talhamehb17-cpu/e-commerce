@@ -5,6 +5,8 @@ import { loadCart } from '@/lib/cart';
 import { generateOrderNumber } from '@/lib/orders';
 import { sendMail, templates } from '@/lib/email';
 import { getSetting } from '@/lib/settings';
+import { recordEvent, visitorHash } from '@/lib/analytics-events';
+import { readSmtpConfig } from '@/lib/smtp-settings';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +20,7 @@ export async function POST(request) {
   const customer = await getCurrentCustomer();
   const { cart, items, totals } = await loadCart(customer?.id || null);
   if (!cart || items.length === 0) return fail('Your bag is empty.', 400);
+  await recordEvent('checkout_started', visitorHash(request));
   if (totals.couponError) return fail(totals.couponError, 400);
 
   const payments = await getSetting('payments');
@@ -102,14 +105,18 @@ export async function POST(request) {
   });
 
   if (result?.error) return fail(`${result.error} just sold out. Please adjust your bag.`, 409);
+  await recordEvent('purchase', visitorHash(request), { orderId: result.id });
 
   // Emails are best-effort and never block the order.
   const tpl = templates.order_placed({ name: data.fullName, order: result, items });
   sendMail({ to: data.email, subject: tpl.subject, html: tpl.html, template: 'order_placed', orderId: result.id }).catch(() => {});
   const emailSettings = await getSetting('email');
-  if (emailSettings.notify_admin && process.env.ORDER_NOTIFICATION_EMAIL) {
+  const smtpSettings = await readSmtpConfig().catch(() => null);
+  const notificationTo = smtpSettings?.recipient || process.env.ORDER_NOTIFICATION_EMAIL;
+  const notifyEnabled = smtpSettings?.orderNotifications ?? Boolean(emailSettings.notify_admin);
+  if (notifyEnabled && notificationTo) {
     const adminTpl = templates.admin_new_order({ order: result, items });
-    sendMail({ to: process.env.ORDER_NOTIFICATION_EMAIL, subject: adminTpl.subject, html: adminTpl.html, template: 'admin_new_order', orderId: result.id }).catch(() => {});
+    sendMail({ to: notificationTo, subject: adminTpl.subject, html: adminTpl.html, template: 'admin_new_order', orderId: result.id }).catch(() => {});
   }
 
   return json({ ok: true, orderNumber: result.order_number, total: result.grand_total, currency: result.currency, displayTotal: result.display_total });

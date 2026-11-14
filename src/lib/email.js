@@ -2,28 +2,30 @@ import nodemailer from 'nodemailer';
 import { sql } from './db.js';
 import { getSetting } from './settings.js';
 import { getTheme } from './themes.js';
+import { readSmtpConfig } from './smtp-settings.js';
 
-let transporter = null;
-function getTransport() {
-  if (transporter) return transporter;
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
-  if (!host || !user || !pass) return null;
-  transporter = nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: Number(process.env.SMTP_PORT || 587) === 465,
-    auth: { user, pass },
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  });
-  return transporter;
+let cachedTransport = null;
+async function getTransport() {
+  const stored = await readSmtpConfig().catch(() => null);
+  const envPassword = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
+  const config = stored?.host && stored?.username && stored?.password ? {
+    host: stored.host, port: Number(stored.port || 587), secure: Boolean(stored.secure), user: stored.username, pass: stored.password, sender: stored.sender,
+  } : {
+    host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: Number(process.env.SMTP_PORT || 587) === 465,
+    user: process.env.SMTP_USER, pass: envPassword, sender: process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER,
+  };
+  if (!config.host || !config.user || !config.pass) return null;
+  const fingerprint = `${config.host}|${config.port}|${config.secure}|${config.user}|${config.pass}`;
+  if (!cachedTransport || cachedTransport.fingerprint !== fingerprint) {
+    cachedTransport = { fingerprint, sender: config.sender, transport: nodemailer.createTransport({ host:config.host, port:config.port, secure:config.secure,
+      auth:{user:config.user,pass:config.pass}, connectionTimeout:10_000, greetingTimeout:10_000, socketTimeout:15_000 }) };
+  }
+  return cachedTransport;
 }
 
-export function emailConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+export async function emailConfigured() {
+  const stored = await readSmtpConfig().catch(() => null);
+  return Boolean((stored?.host && stored?.username && stored?.password) || (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS));
 }
 
 const BRAND = {
@@ -64,16 +66,16 @@ function layout({ title, preheader = '', body, cta, ctaHref, footerNote = '' }) 
 
 export async function sendMail({ to, subject, html, template = 'custom', orderId = null, customerId = null }) {
   const emailSettings = await getSetting('email');
-  const transport = getTransport();
+  const mailer = await getTransport();
   
-  if (!transport) {
+  if (!mailer) {
     await sql`insert into email_logs (to_email, subject, template, order_id, status, error)
       values (${to}, ${subject}, ${template}, ${orderId}, 'skipped', 'SMTP not configured')`.catch(() => {});
     return { ok: false, skipped: true };
   }
   try {
-    const from = emailSettings.from_email || process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
-    await transport.sendMail({
+    const from = mailer.sender || emailSettings.from_email || process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
+    await mailer.transport.sendMail({
       from: `"${emailSettings.from_name || BRAND.name}" <${from}>`,
       to,
       subject,
@@ -85,8 +87,8 @@ export async function sendMail({ to, subject, html, template = 'custom', orderId
     return { ok: true };
   } catch (e) {
     await sql`insert into email_logs (to_email, subject, template, order_id, status, error)
-      values (${to}, ${subject}, ${template}, ${orderId}, 'failed', ${String(e.message).slice(0, 400)})`.catch(() => {});
-    return { ok: false, error: e.message };
+      values (${to}, ${subject}, ${template}, ${orderId}, 'failed', ${'SMTP delivery failed'})`.catch(() => {});
+    return { ok: false, error: 'SMTP delivery failed' };
   }
 }
 

@@ -14,7 +14,7 @@ export async function POST(request) {
 
   const { data, error } = await parse(request, schemas.register);
   if (error) return fail(error, 422);
-  if (process.env.NODE_ENV === 'production' && !emailConfigured()) return fail('Email verification is temporarily unavailable. Please contact support.', 503);
+  if (process.env.NODE_ENV === 'production' && !await emailConfigured()) return fail('Email verification is temporarily unavailable. Please contact support.', 503);
 
   const existing = await sql`select id, password_hash from customers where email = ${data.email}`;
   if (existing[0]?.password_hash) return fail('An account with that email already exists. Sign in instead.', 409);
@@ -38,13 +38,13 @@ export async function POST(request) {
 
   const store = await getSetting('store');
   const settings = await getSetting('email');
-  if (settings.welcome !== false && emailConfigured()) {
+  if (settings.welcome !== false && data.marketing === true && await emailConfigured()) {
     const tpl = templates.welcome({ name: data.name, storeName: store.name });
     await sendMail({ to: data.email, subject: tpl.subject, html: tpl.html, template: 'welcome', customerId });
   }
   // verification code
   const code = await issueOtp(data.email, 'verify_email');
-  if (emailConfigured()) {
+  if (await emailConfigured()) {
     const tpl = templates.otp({ name: data.name, code, purpose: 'verify_email', storeName: store.name });
     await sendMail({ to: data.email, subject: tpl.subject, html: tpl.html, template: 'otp', customerId });
   }
@@ -52,6 +52,6 @@ export async function POST(request) {
   return ok({
     customer: { id: customerId, name: data.name, email: data.email, verified: false },
     verificationRequired: true,
-    devCode: process.env.NODE_ENV === 'production' || emailConfigured() ? undefined : code,
+    devCode: process.env.NODE_ENV === 'production' || await emailConfigured() ? undefined : code,
   });
 }

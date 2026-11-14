@@ -116,6 +116,7 @@ export function AdminDashboard({ initial, emailAlerts }) {
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setRequestKey((key) => `${key}&refresh=${Date.now()}`)} disabled={loading}>
             <RefreshCw size={13} className={loading ? 'dashboard-spin' : ''} /> Refresh
           </button>
+          <Link href="/admin/analytics" className="btn btn-outline btn-sm">Full analytics <ArrowUpRight size={13} /></Link>
           <Link href="/admin/products/new" className="btn btn-sm"><Plus size={13} /> New product</Link>
         </div>
       </div>

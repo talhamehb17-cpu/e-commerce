@@ -2,6 +2,7 @@ import { sql, invalidate } from '@/lib/db';
 import { fail, json, ok, parse, schemas } from '@/lib/api';
 import { getCurrentCustomer, ensureCart, getCart } from '@/lib/auth';
 import { loadCart } from '@/lib/cart';
+import { recordEvent, visitorHash } from '@/lib/analytics-events';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -50,6 +51,7 @@ export async function POST(request) {
       values (${cart.id}, ${data.productId}, ${data.variantId || null}, ${qty}, ${unitPrice}, ${data.giftNote || null})`;
   }
   invalidate('');
+  await recordEvent('add_to_cart', visitorHash(request), { productId: data.productId });
   const fresh = await loadCart(customer?.id || null);
   return ok({ items: fresh.items, totals: fresh.totals, itemCount: fresh.totals.itemCount });
 }

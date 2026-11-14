@@ -8,12 +8,14 @@ import { storageConfigured } from '@/lib/storage';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const { error, status } = await guard('settings:read');
+  const { admin, error, status } = await guard('settings:read');
   if (error) return fail(error, status);
   const settings = await getAllSettings();
+  if (admin.role !== 'owner') delete settings.email;
   return json({
     settings,
-    emailConfigured: emailConfigured(),
+    isOwner: admin.role === 'owner',
+    emailConfigured: admin.role === 'owner' ? await emailConfigured() : null,
     storageConfigured: storageConfigured(),
     dbHost: (process.env.DATABASE_URL || '').replace(/:\/\/[^@]+@/, '://***@').split('?')[0],
   });
@@ -24,6 +26,7 @@ export async function PATCH(request) {
   if (error) return fail(error, status);
   let body; try { body = await request.json(); } catch { return fail('Invalid body', 400); }
   if (!body?.key || !Object.keys(SETTING_DEFAULTS).includes(body.key)) return fail('Unknown settings key', 400);
+  if (body.key === 'email' && admin.role !== 'owner') return fail('Only the store owner can change email settings.', 403);
   if (!body.value || typeof body.value !== 'object') return fail('Invalid settings payload', 422);
   const saved = await setSetting(body.key, body.value);
   invalidate('');
