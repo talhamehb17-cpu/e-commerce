@@ -15,7 +15,10 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-for (const script of ['scripts/migrate.mjs', 'scripts/seed.mjs', 'scripts/sync-settings.mjs']) {
+// Deployment performs only additive/idempotent schema migrations. Seeding catalog data
+// and syncing settings are explicit operator actions and must never mutate live data as
+// a side effect of a UI deployment.
+for (const script of ['scripts/migrate.mjs']) {
   const res = spawnSync(process.execPath, [script], { stdio: 'inherit', env: process.env });
   if (res.status !== 0) {
     console.error(`✖ ${script} failed with exit code ${res.status}`);

@@ -17,15 +17,21 @@ export function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const qs = new URLSearchParams({ q, status, limit: '60' });
-    const res = await fetch(`/api/admin/orders?${qs}`, { cache: 'no-store' });
-    if (res.ok) { const d = await res.json(); setOrders(d.orders); setCounts(d.counts); setTotal(d.total); }
-    setLoading(false);
+  const load = useCallback(async (quiet=false) => {
+    if(!quiet)setLoading(true);
+    try{
+      const qs = new URLSearchParams({ q, status, limit: '60' });
+      const res = await fetch(`/api/admin/orders?${qs}`, { cache: 'no-store' });
+      if (res.ok) { const d = await res.json(); setOrders(d.orders); setCounts(d.counts); setTotal(d.total); }
+    }catch{ /* retain last successful order list; manual refresh remains available */ }
+    finally{if(!quiet)setLoading(false);}
   }, [q, status]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const timer=setInterval(()=>{if(document.visibilityState==='visible')load(true)},30000);
+    return()=>clearInterval(timer);
+  }, [load]);
 
   async function setOrderStatus(id, next) {
     const res = await fetch(`/api/admin/orders/${id}`, {

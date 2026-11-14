@@ -36,5 +36,5 @@ export async function saveSmtpConfig(value) {
 }
 export async function smtpStatus() {
   const value = await readSmtpConfig().catch(() => null);
-  return { configured: !!(value?.host && value?.username && value?.password), host: value?.host || '', port: value?.port || 587, username: value?.username || '', sender: value?.sender || '', recipient: value?.recipient || '', orderNotifications: value?.orderNotifications ?? true, hasStoredPassword: !!value?.password };
+  return { configured: !!(value?.host && value?.username && value?.password), host: value?.host || '', port: value?.port || 587, username: value?.username || '', sender: value?.sender || '', senderName:value?.senderName||'NOVA', replyTo:value?.replyTo||'', recipient: value?.recipient || '', orderNotifications: value?.orderNotifications ?? true, notifications:value?.notifications||{}, hasStoredPassword: !!value?.password };
 }

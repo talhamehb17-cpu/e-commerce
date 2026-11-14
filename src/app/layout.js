@@ -12,6 +12,7 @@ import { ThemeSwitcher } from '@/components/theme-switcher';
 import { Analytics } from '@/components/analytics';
 import { SeasonalEffects } from '@/components/seasonal-effects';
 import { PromotionPopups } from '@/components/promotion-popups';
+import { DeliveryNotifications } from '@/components/delivery-notifications';
 
 export const metadata = {
   title: { default: 'NOVA — Everything, considered.', template: '%s · NOVA' },
@@ -108,6 +109,7 @@ export default async function RootLayout({ children }) {
           <ThemeSwitcher />
           <SeasonalEffects config={seasonal} />
           <PromotionPopups popups={promotions.popups || []} />
+          <DeliveryNotifications />
           <ToastHost />
           <Analytics enabled />
         </StoreProvider>

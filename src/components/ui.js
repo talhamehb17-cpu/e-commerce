@@ -20,14 +20,14 @@ export function ProductCard({ product, money, priority = false, saved = false, o
   return (
     <article className="pcard" data-product-id={product.id}>
       <div className="pcard-media-wrap">
-      <Link href={`/products/${product.slug}`} className="pcard-media" aria-label={product.name} data-has-gallery={Boolean(product.image2 && product.image2 !== product.image)}>
-        <span className="pcard-badges">
-          {product.badge === 'new' && <span className="tag new">New</span>}
+        <span className="pcard-badges" aria-label="Product labels">
+          {product.badge === 'new' && <span className="tag new">New Arrival</span>}
           {product.badge === 'bestseller' && <span className="tag">Bestseller</span>}
-          {product.badge === 'limited' && <span className="tag limited">Limited</span>}
-          {hasCompare && <span className="tag sale">−{Math.round(100 - (product.price / product.compareAtPrice) * 100)}%</span>}
+          {product.badge === 'limited' && <span className="tag limited">Limited offer</span>}
+          {hasCompare && <span className="tag sale">−{Math.round(100 - (product.price / product.compareAtPrice) * 100)}% off</span>}
           {product.stock === 0 && <span className="tag">Sold out</span>}
         </span>
+      <Link href={`/products/${product.slug}`} className="pcard-media" aria-label={product.name} data-has-gallery={Boolean(product.image2 && product.image2 !== product.image)}>
         <Image className="img-a" src={product.image} alt={product.name} fill sizes={sizes} priority={priority} quality={78} />
         {product.image2 && product.image2 !== product.image && <Image className="img-b" src={product.image2} alt={`${product.name}, alternate view`} fill sizes={sizes} quality={78} aria-hidden="true" />}
       </Link>

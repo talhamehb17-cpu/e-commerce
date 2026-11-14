@@ -28,6 +28,10 @@ export async function PATCH(request) {
   if (!body?.key || !Object.keys(SETTING_DEFAULTS).includes(body.key)) return fail('Unknown settings key', 400);
   if (body.key === 'email' && admin.role !== 'owner') return fail('Only the store owner can change email settings.', 403);
   if (!body.value || typeof body.value !== 'object') return fail('Invalid settings payload', 422);
+  if (body.key === 'store' && body.value.timezone != null) {
+    try { new Intl.DateTimeFormat('en', { timeZone: body.value.timezone }); }
+    catch { return fail('Enter a valid IANA timezone, for example Asia/Karachi.', 422); }
+  }
   const saved = await setSetting(body.key, body.value);
   invalidate('');
   await audit(admin, 'settings_updated', 'settings', body.key, Object.keys(body.value));

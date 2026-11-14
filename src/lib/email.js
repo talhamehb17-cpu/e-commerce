@@ -15,9 +15,9 @@ async function getTransport() {
     user: process.env.SMTP_USER, pass: envPassword, sender: process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER,
   };
   if (!config.host || !config.user || !config.pass) return null;
-  const fingerprint = `${config.host}|${config.port}|${config.secure}|${config.user}|${config.pass}`;
+  const fingerprint = `${config.host}|${config.port}|${config.secure}|${config.user}|${config.pass}|${config.sender}|${stored?.senderName||''}|${stored?.replyTo||''}|${JSON.stringify(stored?.notifications||{})}|${stored?.orderNotifications}`;
   if (!cachedTransport || cachedTransport.fingerprint !== fingerprint) {
-    cachedTransport = { fingerprint, sender: config.sender, transport: nodemailer.createTransport({ host:config.host, port:config.port, secure:config.secure,
+    cachedTransport = { fingerprint, sender: config.sender, senderName:stored?.senderName || process.env.MAIL_FROM_NAME || 'NOVA', replyTo:stored?.replyTo || '', notifications:stored?.notifications || {}, orderNotifications:stored?.orderNotifications ?? true, transport: nodemailer.createTransport({ host:config.host, port:config.port, secure:config.secure,
       auth:{user:config.user,pass:config.pass}, connectionTimeout:10_000, greetingTimeout:10_000, socketTimeout:15_000 }) };
   }
   return cachedTransport;
@@ -64,9 +64,34 @@ function layout({ title, preheader = '', body, cta, ctaHref, footerNote = '' }) 
   </table></body></html>`;
 }
 
+const templateSwitch = (template) => {
+  if(template==='order_placed')return 'orderConfirmation';
+  if(template==='admin_new_order')return 'adminOrder';
+  if(template==='status_confirmed')return 'paymentConfirmation';
+  if(template==='status_processing'||template==='status_packed')return 'orderProcessing';
+  if(template==='status_shipped')return 'shipped';
+  if(template==='status_out_for_delivery')return 'outForDelivery';
+  if(template.startsWith('status_delivered'))return 'deliveryConfirmed';
+  if(template==='status_cancelled'||template==='status_returned'||template==='refund')return 'cancellationsRefunds';
+  if(template==='welcome'||template==='otp'||template==='password_reset'||template==='password_changed')return 'accountSecurity';
+  if(template==='marketing')return 'marketing';
+  return null;
+};
+
 export async function sendMail({ to, subject, html, template = 'custom', orderId = null, customerId = null }) {
   const emailSettings = await getSetting('email');
   const mailer = await getTransport();
+  const toggle=templateSwitch(template);
+  if(toggle&&mailer&&mailer.notifications[toggle]===false){
+    await sql`insert into email_logs(to_email,subject,template,order_id,status,error) values(${to},${subject},${template},${orderId},'skipped','Disabled in email notification settings')`.catch(()=>{});
+    return {ok:false,skipped:true};
+  }
+  if(template==='admin_new_order'&&mailer&&mailer.orderNotifications===false)return {ok:false,skipped:true};
+  if(template==='marketing'){
+    if(!customerId)return {ok:false,skipped:true};
+    const consent=await sql`select marketing_opt_in from customers where id=${customerId} limit 1`;
+    if(!consent[0]?.marketing_opt_in)return {ok:false,skipped:true};
+  }
   
   if (!mailer) {
     await sql`insert into email_logs (to_email, subject, template, order_id, status, error)
@@ -76,7 +101,8 @@ export async function sendMail({ to, subject, html, template = 'custom', orderId
   try {
     const from = mailer.sender || emailSettings.from_email || process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
     await mailer.transport.sendMail({
-      from: `"${emailSettings.from_name || BRAND.name}" <${from}>`,
+      from: `"${mailer.senderName || emailSettings.from_name || BRAND.name}" <${from}>`,
+      ...(mailer.replyTo ? {replyTo:mailer.replyTo} : {}),
       to,
       subject,
       html,

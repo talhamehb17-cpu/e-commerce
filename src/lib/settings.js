@@ -8,6 +8,7 @@ const DEFAULTS = {
   store: () => ({
     name: 'NOVA',
     tagline: 'Everything, considered.',
+    timezone: 'Asia/Karachi',
     email: 'hello@novastore.com',
     phone: '+92 300 000 0000',
     address: 'Studio 4, Gulberg III, Lahore, Pakistan',

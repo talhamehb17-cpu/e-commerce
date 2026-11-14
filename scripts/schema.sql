@@ -227,6 +227,7 @@ create table if not exists orders (
   placed_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   delivered_at timestamptz,
+  out_for_delivery_at timestamptz,
   cancelled_at timestamptz
 );
 
@@ -264,8 +265,23 @@ create table if not exists delivery_confirmations (
   next_reminder_at timestamptz not null default now(),
   last_reminder_at timestamptz,
   reminder_count int not null default 0,
+  due_at timestamptz not null default (now() + interval '10 minutes'),
+  lease_until timestamptz,
   created_at timestamptz not null default now()
 );
+-- Safe additive upgrade for stores created before the persisted delivery queue.
+alter table orders add column if not exists out_for_delivery_at timestamptz;
+alter table delivery_confirmations add column if not exists due_at timestamptz;
+alter table delivery_confirmations add column if not exists lease_until timestamptz;
+update delivery_confirmations set due_at = created_at + interval '10 minutes' where due_at is null;
+alter table delivery_confirmations alter column due_at set default (now() + interval '10 minutes');
+alter table delivery_confirmations alter column due_at set not null;
+update orders o set out_for_delivery_at=coalesce(
+  (select min(e.created_at) from order_events e where e.order_id=o.id and e.status='out_for_delivery'),
+  (select dc.created_at from delivery_confirmations dc where dc.order_id=o.id)
+) where o.status='out_for_delivery' and o.out_for_delivery_at is null;
+create index if not exists idx_delivery_confirmations_due on delivery_confirmations(customer_id, due_at, lease_until) where state='pending';
+create index if not exists idx_orders_out_for_delivery_at on orders(out_for_delivery_at) where status='out_for_delivery';
 create table if not exists admin_notifications (
   id uuid primary key default gen_random_uuid(),
   type text not null,

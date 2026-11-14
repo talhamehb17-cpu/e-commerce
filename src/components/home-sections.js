@@ -70,67 +70,56 @@ export function HomeSections({ sections, data }) {
   );
 }
 
-function Hero({ section, config }) {
-  const stats = config.stats || [];
-  return (
-    <section className="hero">
-      <div className="hero-glow a" />
-      <div className="hero-glow b" />
-      <div className="wrap hero-grid">
-        <div className="hero-copy">
-          <Reveal>
-            <div className="eyebrow">{section.eyebrow}</div>
-            <h1>
-              {section.title?.split(' ').slice(0, -1).join(' ')}{' '}
-              <em>{section.title?.split(' ').slice(-1)}</em>
-            </h1>
-            <p className="hero-lede">{section.subtitle}</p>
-          </Reveal>
-          <Reveal delay={120}>
-            <div className="hero-cta">
-              <Link className="btn" href={section.cta_href || '/shop'}>{section.cta_label || 'Shop all'} <ArrowRight size={15} /></Link>
-              {config.secondary_cta && <Link className="btn btn-outline" href={config.secondary_href || '/about'}>{config.secondary_cta}</Link>}
-            </div>
-          </Reveal>
-          {stats.length > 0 && (
-            <Reveal delay={200}>
-              <div className="hero-stats">
-                {stats.map(([value, label]) => (
-                  <div key={label}>
-                    <span>{value}</span>
-                    <small>{label}</small>
-                  </div>
-                ))}
-              </div>
-            </Reveal>
-          )}
-        </div>
-        <div className="hero-media">
-          <Reveal delay={60} className="frame hero-main-frame">
-            <Image src={section.image_url || '/images/hero/hero-main.jpg'} alt={section.title || 'Featured collection'} fill priority sizes="(max-width:980px) 90vw, 46vw" quality={82} style={{ objectFit: 'cover' }} />
-          </Reveal>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {config.secondary_image && (
-              <Reveal delay={140} className="frame hero-side-frame">
-                <Image src={config.secondary_image} alt="" fill sizes="(max-width:980px) 40vw, 20vw" quality={78} style={{ objectFit: 'cover' }} />
-              </Reveal>
-            )}
-            <Reveal delay={220}>
-              <div className="hero-float" style={{ position: 'static' }}>
-                <Sparkles size={18} style={{ color: 'var(--accent)' }} />
-                <div>
-                  <strong>48h</strong>
-                  <small>Dispatch window</small>
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+const HERO_LAYOUT_BY_STYLE={
+  editorial:'split-right',luxury:'premium-dark',boutique:'split-left',heritage:'collage',minimal:'spacious',
+  artisan:'product-focused',modern:'floating-panel',classic:'magazine',bold:'marketplace',atelier:'split-right',
+  industrial:'full-bleed',neon:'floating-panel',organic:'split-left',dramatic:'premium-dark',glass:'floating-panel',
+  mono:'spacious',scandi:'product-focused',soft:'collage',gradient:'marketplace',aurora:'full-bleed',earth:'magazine',utility:'marketplace',
+};
+
+function HeroCopy({section,config,stats=[]}) {
+  return <div className="hero-copy">
+    <Reveal><div className="eyebrow">{section.eyebrow}</div><h1>{section.title?.split(' ').slice(0,-1).join(' ')}{' '}<em>{section.title?.split(' ').slice(-1)}</em></h1><p className="hero-lede">{section.subtitle}</p></Reveal>
+    <Reveal delay={120}><div className="hero-cta"><Link className="btn" href={section.cta_href||'/shop'}>{section.cta_label||'Shop all'} <ArrowRight size={15}/></Link>{config.secondary_cta&&<Link className="btn btn-outline" href={config.secondary_href||'/about'}>{config.secondary_cta}</Link>}</div></Reveal>
+    {stats.length>0&&<Reveal delay={200}><div className="hero-stats">{stats.map(([value,label])=><div key={label}><span>{value}</span><small>{label}</small></div>)}</div></Reveal>}
+  </div>;
 }
 
+function HeroImage({src,alt,className='hero-art-image',sizes='(max-width:980px) 100vw, 52vw',priority=false}) {
+  return <Image className={className} src={src||'/images/hero/hero-main.jpg'} alt={alt||''} fill sizes={sizes} priority={priority} quality={82} style={{objectFit:'cover'}}/>;
+}
+
+function Hero({ section, config }) {
+  const store=useStore();
+  const themeSlug=store?.theme?.slug||'moonstone';
+  const style=['editorial','luxury','boutique','heritage','minimal','artisan','modern','classic','bold','atelier','industrial','neon','organic','dramatic','glass','mono','scandi','soft','gradient','aurora','earth','utility'].includes(themeSlug)?themeSlug:'editorial';
+  const layout=HERO_LAYOUT_BY_STYLE[style]||'split-right';
+  const main=section.image_url||'/images/hero/hero-main.jpg';
+  const secondary=config.secondary_image||'';
+  const copy=<HeroCopy section={section} config={config} stats={config.stats||[]}/>;
+
+  if(layout==='full-bleed'||layout==='premium-dark') return <section className={`hero hero-layout-${layout}`} data-hero-layout={layout}>
+    <HeroImage src={main} alt={section.title||'Featured collection'} className="hero-background-image" sizes="100vw" priority/>
+    <div className="hero-image-shade"/><div className="wrap hero-overlay-content">{copy}</div>
+  </section>;
+
+  if(layout==='split-left') return <section className="hero hero-layout-split-left" data-hero-layout={layout}><div className="wrap hero-split-shell"><div className="hero-media hero-media-left"><Reveal className="frame hero-main-frame"><HeroImage src={main} alt={section.title||'Featured collection'} priority/></Reveal>{secondary&&<Reveal delay={100} className="frame hero-side-frame"><HeroImage src={secondary} alt="" sizes="(max-width:980px) 45vw,20vw"/></Reveal>}</div>{copy}</div></section>;
+
+  if(layout==='collage') return <section className="hero hero-layout-collage" data-hero-layout={layout}><div className="wrap hero-collage-shell">{copy}<div className="hero-collage-media"><Reveal className="hero-collage-main"><HeroImage src={main} alt={section.title||'Featured collection'} priority/></Reveal>{secondary&&<Reveal delay={120} className="hero-collage-secondary"><HeroImage src={secondary} alt="" sizes="(max-width:980px) 45vw,24vw"/></Reveal>}<span className="hero-collage-caption">{section.eyebrow||'NOVA · THE EDIT'}</span></div></div></section>;
+
+  if(layout==='spacious') return <section className="hero hero-layout-spacious" data-hero-layout={layout}><div className="wrap hero-spacious-shell">{copy}<Reveal className="hero-spacious-image"><HeroImage src={main} alt={section.title||'Featured collection'} sizes="(max-width:980px) 100vw,80vw" priority/></Reveal></div></section>;
+
+  if(layout==='product-focused') return <section className="hero hero-layout-product-focused" data-hero-layout={layout}><div className="wrap hero-product-shell">{copy}<div className="hero-product-stage"><Reveal className="hero-product-image"><HeroImage src={main} alt={section.title||'Featured collection'} priority/></Reveal>{secondary&&<Reveal delay={120} className="hero-product-support"><HeroImage src={secondary} alt="" sizes="(max-width:980px) 35vw,18vw"/></Reveal>}<div className="hero-product-label"><Sparkles size={16}/><span>Selected for you</span></div></div></div></section>;
+
+  if(layout==='floating-panel') return <section className="hero hero-layout-floating" data-hero-layout={layout}><HeroImage src={main} alt={section.title||'Featured collection'} className="hero-background-image" sizes="100vw" priority/><div className="hero-image-shade"/><div className="wrap hero-floating-shell"><div className="hero-floating-panel">{copy}</div></div></section>;
+
+  if(layout==='magazine') return <section className="hero hero-layout-magazine" data-hero-layout={layout}><div className="wrap hero-magazine-shell"><div className="hero-magazine-kicker">NOVA / {section.eyebrow||'THE CONSIDERED EDIT'}</div>{copy}<Reveal className="hero-magazine-image"><HeroImage src={main} alt={section.title||'Featured collection'} priority/></Reveal>{secondary&&<Reveal className="hero-magazine-inset"><HeroImage src={secondary} alt="" sizes="(max-width:980px) 40vw,20vw"/></Reveal>}</div></section>;
+
+  if(layout==='marketplace') return <section className="hero hero-layout-marketplace" data-hero-layout={layout}><div className="wrap hero-marketplace-shell">{copy}<Reveal className="hero-marketplace-image"><HeroImage src={main} alt={section.title||'Featured collection'} priority/><span className="hero-marketplace-label">NOVA PICKS · SHOP THE EDIT</span></Reveal></div></section>;
+
+  // Editorial and atelier use a distinct text-left/image-right split composition.
+  return <section className="hero hero-layout-split-right" data-hero-layout="split-right"><div className="hero-glow a"/><div className="hero-glow b"/><div className="wrap hero-grid">{copy}<div className="hero-media"><Reveal delay={60} className="frame hero-main-frame"><HeroImage src={main} alt={section.title||'Featured collection'} priority/></Reveal><div className="hero-side-stack">{secondary&&<Reveal delay={140} className="frame hero-side-frame"><HeroImage src={secondary} alt="" sizes="(max-width:980px) 40vw,20vw"/></Reveal>}<div className="hero-float"><Sparkles size={18} style={{color:'var(--accent)'}}/><div><strong>48h</strong><small>Dispatch window</small></div></div></div></div></div></section>;
+}
 function Marquee({ items }) {
   if (!items.length) return null;
   return (
@@ -174,7 +163,8 @@ function Banner({ section }) {
       <div className="wrap">
         <Reveal>
           <div className="banner" data-align={align}>
-            <Image src={section.image_url || '/images/hero/hero-main.jpg'} alt={section.title || ''} fill sizes="100vw" quality={78} style={{ objectFit: 'cover' }} />
+            <Image className="banner-desktop-image" src={section.image_url || '/images/hero/hero-main.jpg'} alt={section.title || ''} fill sizes="100vw" quality={78} style={{ objectFit: 'cover' }} />
+            {section.config?.mobile_image && <Image className="banner-mobile-image" src={section.config.mobile_image} alt="" fill sizes="100vw" quality={78} style={{ objectFit: 'cover' }} />}
             <div className="banner-inner">
               <div className="eyebrow">{section.eyebrow}</div>
               <h2>{section.title}</h2>

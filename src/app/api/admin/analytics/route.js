@@ -9,11 +9,18 @@ export async function GET(request) {
   if (!rateLimit(`admin-analytics:${admin.id}`, 60, 60_000).ok) return fail('Analytics requests are rate limited. Try again shortly.',429);
   const params = new URL(request.url).searchParams;
   const cacheKey = new URLSearchParams([...params.entries()].filter(([key]) => key !== 'format')).toString();
-  const data = await cached(`admin-analytics:${cacheKey}`, 30_000, () => getAnalytics(params));
+  let data;
+  try {
+    data = await cached(`admin-analytics:${cacheKey}`, 30_000, () => getAnalytics(params));
+  } catch (cause) {
+    const message = cause?.message || 'Analytics are temporarily unavailable.';
+    const badInput = /choose valid|no more than \d+ days|choose a valid|hourly grouping is limited/i.test(message);
+    return fail(badInput ? message : 'Analytics are temporarily unavailable.', badInput ? 400 : 500);
+  }
   if (params.get('format') === 'pdf') {
     const safe = value => String(value ?? '').replace(/[^\x20-\x7E]/g, '?').replace(/[\\()]/g, '\\$&');
     const lines = [
-      'NOVA COMMERCE ANALYTICS REPORT', `Period: ${data.range.start} through ${data.range.end}`,
+      'NOVA COMMERCE ANALYTICS REPORT', `Local report dates: ${data.range.from} through ${data.range.to} (${data.range.timezone})`, `UTC window: ${data.range.start} through ${data.range.end}`,
       'Money: base currency minor units; gross paid order values exclude cancelled/refunded status and are not refund-adjusted.',
       `Matching orders: ${data.totals.orders}`, `Gross paid order value: ${data.totals.revenue}`,
       `Outstanding unpaid amount: ${data.totals.outstanding}`, `Discounts recorded: ${data.totals.discounts}`,
@@ -38,15 +45,21 @@ export async function GET(request) {
   }
   if (params.get('format') !== 'csv') return json(data);
   const statusFilter=params.get('status')||null, payment=params.get('payment')||null, campaign=params.get('campaign')||null, product=params.get('product')||null, category=params.get('category')||null;
-  const rows = await sql`select o.order_number,o.placed_at,o.status,o.payment_status,o.payment_method,o.currency,o.grand_total,o.discount_total,o.coupon_code
+  let rows;
+  try {
+  rows = await sql`select o.order_number,o.placed_at,o.status,o.payment_status,o.payment_method,o.currency as transaction_currency,o.display_total as transaction_total_minor,o.grand_total as base_total_minor,o.discount_total,o.coupon_code
     from orders o where o.placed_at >= ${data.range.start}::timestamptz and o.placed_at < ${data.range.end}::timestamptz
       and (${statusFilter}::text is null or o.status=${statusFilter}) and (${payment}::text is null or o.payment_method=${payment})
       and (${campaign}::text is null or o.coupon_code=${campaign})
       and (${product}::text is null or exists(select 1 from order_items oi where oi.order_id=o.id and oi.product_id::text=${product}))
       and (${category}::text is null or exists(select 1 from order_items oi join products p on p.id=oi.product_id where oi.order_id=o.id and p.category_id::text=${category}))
     order by o.placed_at desc limit 5000`;
-  const fields=['order_number','placed_at','status','payment_status','payment_method','currency','grand_total','discount_total','coupon_code'];
-  const escape=v=>`"${String(v??'').replaceAll('"','""')}"`;
+  } catch (cause) {
+    console.error('Analytics CSV export failed:', cause?.message || 'unknown error');
+    return fail('Analytics export is temporarily unavailable.', 500);
+  }
+  const fields=['order_number','placed_at','status','payment_status','payment_method','transaction_currency','transaction_total_minor','base_total_minor','discount_total','coupon_code'];
+  const escape=v=>{const value=String(v??'');const safe=/^[=+@\-\t\r]/.test(value)?`'${value}`:value;return `"${safe.replaceAll('"','""')}"`;};
   const csv=[fields.join(','),...rows.map(r=>fields.map(k=>escape(r[k])).join(','))].join('\r\n');
   return new Response(csv,{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="nova-analytics-orders.csv"','Cache-Control':'no-store'}});
 }

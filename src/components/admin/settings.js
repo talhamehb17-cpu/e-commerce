@@ -80,6 +80,7 @@ export function AdminSettings() {
             <div className="field"><label>Phone</label><input className="input" value={s.store.phone} onChange={(e) => set('store', 'phone', e.target.value)} /></div>
           </div>
           <div className="field"><label>Address</label><input className="input" value={s.store.address} onChange={(e) => set('store', 'address', e.target.value)} /></div>
+          <div className="field"><label>Store timezone (IANA)</label><input className="input" value={s.store.timezone || 'Asia/Karachi'} onChange={(e) => set('store', 'timezone', e.target.value)} placeholder="Asia/Karachi" /><small className="sub">Analytics date boundaries and displayed timestamps use this timezone, including daylight-saving changes.</small></div>
           <div className="form-row">
             <div className="field"><label>Instagram URL</label><input className="input" value={s.store.instagram || ''} onChange={(e) => set('store', 'instagram', e.target.value)} /></div>
             <div className="field"><label>Facebook URL</label><input className="input" value={s.store.facebook || ''} onChange={(e) => set('store', 'facebook', e.target.value)} /></div>

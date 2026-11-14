@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { StatusPill } from '../ui';
@@ -15,17 +15,22 @@ export function AdminOrderDetail({ id }) {
   const [form, setForm] = useState({ status: '', note: '', trackingNumber: '', carrier: '', sendEmail: true });
   const [saving, setSaving] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    const res = await fetch(`/api/admin/orders/${id}`, { cache: 'no-store' });
-    if (res.ok) {
-      const d = await res.json();
-      setData(d);
-      setForm((f) => ({ ...f, status: d.order.status, trackingNumber: d.order.tracking_number || '', carrier: d.order.carrier || '' }));
-    }
-    setLoading(false);
-  }
-  useEffect(() => { load(); }, [id]); // eslint-disable-line
+  const load=useCallback(async(quiet=false)=>{
+    if(!quiet)setLoading(true);
+    try{
+      const res=await fetch(`/api/admin/orders/${id}`,{cache:'no-store'});
+      if(res.ok){
+        const d=await res.json();setData(d);
+        setForm(f=>({...f,status:!quiet||f.status===data?.order?.status?d.order.status:f.status,
+          trackingNumber:d.order.tracking_number||'',carrier:d.order.carrier||''}));
+      }
+    }catch{/* keep the last successful view on transient network errors */}
+    finally{if(!quiet)setLoading(false)}
+  },[id,data?.order?.status]);
+  useEffect(()=>{
+    load();const timer=setInterval(()=>{if(document.visibilityState==='visible')load(true)},30000);
+    return()=>clearInterval(timer);
+  },[load]);
 
   async function update() {
     setSaving(true);

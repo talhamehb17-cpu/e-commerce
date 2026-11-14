@@ -28,75 +28,54 @@ export async function fulfillOrder(orderNumber) {
   `.then((r) => r[0] || null);
 }
 
-/**
- * Apply a status change: persist, record history, and email the customer once.
- * Duplicate notifications are prevented by only emailing on an actual change.
- */
+/** Persist an order transition and its durable side effects atomically. SMTP runs only
+ * after commit so network latency never leaves a half-updated fulfillment state. */
 export async function changeOrderStatus({ orderId, status, note = '', actor = 'admin', trackingNumber, carrier, sendEmail = true }) {
   if (!ORDER_STATUSES.includes(status)) throw new Error('Invalid status');
-
-  const rows = await sql`select * from orders where id = ${orderId} limit 1`;
-  const order = rows[0];
-  if (!order) throw new Error('Order not found');
-  const previous = order.status;
-  if (previous === status && !trackingNumber && !carrier) {
-    return { changed: false, order };
-  }
-
-  const patch = { status };
-  if (trackingNumber !== undefined) patch.tracking_number = trackingNumber;
-  if (carrier !== undefined) patch.carrier = carrier;
-
-  const delivered = status === 'delivered' ? new Date() : null;
-  const cancelled = status === 'cancelled' ? new Date() : null;
-
-  const updated = await sql`
-    update orders set
-      status = ${status},
-      tracking_number = ${patch.tracking_number ?? order.tracking_number},
-      carrier = ${patch.carrier ?? order.carrier},
-      updated_at = now(),
-      delivered_at = ${delivered ?? order.delivered_at},
-      cancelled_at = ${cancelled ?? order.cancelled_at},
-      payment_status = ${status === 'delivered' && order.payment_method === 'cod' ? 'paid' : status === 'cancelled' ? order.payment_status : order.payment_status}
-    where id = ${orderId}
-    returning *
-  `;
-
-  const event = await sql`
-    insert into order_events (order_id, status, note, actor) values (${orderId}, ${status}, ${note}, ${actor})
-    returning id
-  `;
-
-  // This is a customer-confirmation request, not proof of delivery. It remains pending
-  // until the customer responds; no automated rule changes an order to delivered.
-  if (status === 'out_for_delivery' && previous !== 'out_for_delivery' && order.customer_id) {
-    await sql`insert into delivery_confirmations (order_id, customer_id, state, next_reminder_at)
-      values (${orderId}, ${order.customer_id}, 'pending', now())
-      on conflict (order_id) do update set state='pending', response_at=null,
-        reminder_count=0, created_at=now(), next_reminder_at=now()
-      where delivery_confirmations.state <> 'pending'`;
-  }
-
-  // restock on cancellation
-  if (status === 'cancelled' && previous !== 'cancelled') {
-    const items = await sql`select product_id, variant_id, qty from order_items where order_id = ${orderId}`;
-    for (const it of items) {
-      if (it.product_id) await sql`update products set stock = stock + ${it.qty} where id = ${it.product_id}`;
-      if (it.variant_id) await sql`update product_variants set stock = stock + ${it.qty} where id = ${it.variant_id}`;
+  const transition=await sql.begin(async tx=>{
+    const rows=await tx`select * from orders where id=${orderId} for update`;
+    const order=rows[0];
+    if(!order)return {error:'Order not found'};
+    const previous=order.status;
+    if(previous===status&&!trackingNumber&&!carrier)return {changed:false,order};
+    const delivered=status==='delivered'?new Date():null;
+    const cancelled=status==='cancelled'?new Date():null;
+    const updated=await tx`update orders set
+      status=${status},tracking_number=${trackingNumber??order.tracking_number},carrier=${carrier??order.carrier},updated_at=now(),
+      delivered_at=${delivered??order.delivered_at},
+      out_for_delivery_at=case when ${status}='out_for_delivery' and ${previous}<>'out_for_delivery' then now() else out_for_delivery_at end,
+      cancelled_at=${cancelled??order.cancelled_at},
+      payment_status=${status==='delivered'&&order.payment_method==='cod'?'paid':order.payment_status}
+      where id=${orderId} returning *`;
+    const event=await tx`insert into order_events(order_id,status,note,actor) values(${orderId},${status},${note},${actor}) returning id`;
+    if(status==='out_for_delivery'&&previous!=='out_for_delivery'&&order.customer_id){
+      await tx`insert into delivery_confirmations(order_id,customer_id,state,response_at,next_reminder_at,last_reminder_at,reminder_count,due_at,lease_until,created_at)
+        values(${orderId},${order.customer_id},'pending',null,now()+interval '10 minutes',null,0,now()+interval '10 minutes',null,now())
+        on conflict(order_id) do update set customer_id=excluded.customer_id,state='pending',response_at=null,reminder_count=0,
+          created_at=now(),next_reminder_at=now()+interval '10 minutes',due_at=now()+interval '10 minutes',last_reminder_at=null,lease_until=null`;
+    }else if(previous==='out_for_delivery'&&status!=='out_for_delivery'){
+      await tx`update delivery_confirmations set state='superseded',lease_until=null where order_id=${orderId} and state='pending'`;
     }
+    if(status==='cancelled'&&previous!=='cancelled'){
+      const items=await tx`select product_id,variant_id,qty from order_items where order_id=${orderId}`;
+      for(const item of items){
+        if(item.product_id)await tx`update products set stock=stock+${item.qty} where id=${item.product_id}`;
+        if(item.variant_id)await tx`update product_variants set stock=stock+${item.qty} where id=${item.variant_id}`;
+      }
+    }
+    return {changed:true,previous,order:updated[0],eventId:event[0].id};
+  });
+  if(transition.error)throw new Error(transition.error);
+  if(!transition.changed)return transition;
+  let emailed=false;
+  const emailSettings=await getSetting('email');
+  if(sendEmail&&emailSettings.order_updates&&['confirmed','processing','packed','shipped','out_for_delivery','delivered','cancelled','returned'].includes(status)){
+    const template=templates.status_update({name:transition.order.shipping_address?.full_name||'there',order:transition.order,status,note});
+    const sent=await sendMail({to:transition.order.email,subject:template.subject,html:template.html,template:`status_${status}`,orderId});
+    emailed=Boolean(sent.ok);
   }
-
-  let emailed = false;
-  const emailSettings = await getSetting('email');
-  if (sendEmail && emailSettings.order_updates && ['confirmed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned'].includes(status)) {
-    const tpl = templates.status_update({ name: order.shipping_address?.full_name || 'there', order: updated[0], status, note });
-    const res = await sendMail({ to: order.email, subject: tpl.subject, html: tpl.html, template: `status_${status}`, orderId });
-    emailed = Boolean(res.ok);
-  }
-  await sql`update order_events set email_sent = ${emailed} where id = ${event[0].id}`;
-
-  return { changed: true, order: updated[0], emailed };
+  await sql`update order_events set email_sent=${emailed} where id=${transition.eventId}`;
+  return {...transition,emailed};
 }
 
 export function timelineFor(order, events = []) {
