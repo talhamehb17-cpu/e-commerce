@@ -153,7 +153,7 @@ export function AdminDashboard({ initial, initialError = '', emailAlerts }) {
         <Kpi label="Visitor-days" value={data?compact(t.visitorDays):'—'} delta={data?`${compact(t.pageViews)} page views · daily anonymous hashes`:'Data unavailable'} icon={Eye} />
       </div>
       <section className="panel dashboard-revenue-panel" aria-label="Monthly revenue graph">
-        <div className="panel-head"><div><h3>Monthly revenue</h3><p className="sub">Paid gross order value, base-currency PKR · cancelled/refunded statuses excluded; not profit or refund-adjusted net revenue</p></div><span className="eyebrow">Last 12 months</span></div>
+        <div className="panel-head"><div><h3>Monthly revenue</h3><p className="sub">Paid gross order value grouped by order date · base-currency PKR · COD counts paid on delivery; cancelled/refunded orders excluded · not profit or refund-adjusted net revenue</p></div><span className="eyebrow">Last 12 months</span></div>
         <MonthlyRevenueGraph rows={data?.monthlyRevenue||[]} error={data?.monthlyRevenueError||error} loading={loading} onRetry={() => setRequestKey((key) => `${key}&refresh=${Date.now()}`)} />
       </section>
       <div className="admin-grid dashboard-grid dashboard-grid-last">

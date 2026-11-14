@@ -46,7 +46,8 @@ export async function POST(request, { params }) {
         products:items,status:order.status,response:body.response,responseAt};
 
       if (body.response === 'received') {
-        const updated = await tx`update orders set status='delivered',delivered_at=coalesce(delivered_at,now()),updated_at=now()
+        const updated = await tx`update orders set status='delivered',delivered_at=coalesce(delivered_at,now()),updated_at=now(),
+          payment_status=case when payment_method='cod' then 'paid' else payment_status end
           where id=${order.id} and customer_id=${customer.id} and status='out_for_delivery' returning *`;
         if (!updated[0]) return {error:'Order status changed before confirmation was saved. Refresh and try again.',status:409};
         await tx`insert into order_events(order_id,status,note,actor) values(${order.id},'delivered','Customer confirmed receipt of the order.',${`customer:${customer.id}`})`;

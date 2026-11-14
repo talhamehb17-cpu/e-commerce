@@ -255,6 +255,17 @@ create table if not exists order_events (
   created_at timestamptz not null default now()
 );
 
+-- Customer-confirmed COD deliveries use the same paid-on-delivery rule as admin status changes.
+-- Repair only records created by that affected path; already-paid and other payment methods are untouched.
+update orders o set payment_status='paid',updated_at=now()
+where o.payment_method='cod' and o.status='delivered' and o.payment_status<>'paid'
+  and exists (
+    select 1 from order_events e
+    where e.order_id=o.id and e.status='delivered'
+      and e.actor like 'customer:%'
+      and e.note='Customer confirmed receipt of the order.'
+  );
+
 -- Customer response workflow for out-for-delivery orders. Reminder leasing is database-backed,
 -- so only one browser tab can claim a reminder at a time.
 create table if not exists delivery_confirmations (
