@@ -37,7 +37,7 @@ export async function destroySession(isAdmin = false) {
   store.delete(name);
 }
 
-async function readSession(name, subjectType) {
+async function readSession(name, subjectType, failOnStoreError = false) {
   const store = await cookies();
   const token = store.get(name)?.value;
   if (!token) return null;
@@ -52,7 +52,8 @@ async function readSession(name, subjectType) {
       limit 1
     `;
     return rows[0] || null;
-  } catch {
+  } catch (error) {
+    if (failOnStoreError) throw error;
     return null;
   }
 }
@@ -71,7 +72,7 @@ export async function getCurrentCustomer() {
 }
 
 export async function getCurrentAdmin() {
-  const s = await readSession(ADMIN_COOKIE, 'admin');
+  const s = await readSession(ADMIN_COOKIE, 'admin', true);
   if (!s) return null;
   const rows = await sql`
     select id, name, email, role, permissions, avatar_url, is_active

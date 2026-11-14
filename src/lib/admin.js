@@ -2,7 +2,13 @@ import { sql } from './db.js';
 import { getCurrentAdmin, can } from './auth.js';
 
 export async function guard(permission) {
-  const admin = await getCurrentAdmin();
+  let admin;
+  try {
+    admin = await getCurrentAdmin();
+  } catch (error) {
+    console.error('Admin session verification failed:', error?.message || 'unknown error');
+    return { error: 'Admin session verification is temporarily unavailable.', status: 503, admin: null };
+  }
   if (!admin) return { error: 'Unauthenticated', status: 401, admin: null };
   if (permission && !can(admin, permission)) return { error: 'Not permitted', status: 403, admin };
   return { admin, error: null };

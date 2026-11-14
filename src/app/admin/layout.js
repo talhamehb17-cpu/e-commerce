@@ -12,7 +12,13 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }) {
-  const admin = await getCurrentAdmin();
+  let admin;
+  try {
+    admin = await getCurrentAdmin();
+  } catch (error) {
+    console.error('Admin authentication/session lookup failed:', error?.message || 'unknown error');
+    return <main className="panel" role="alert" style={{ maxWidth: 720, margin: '10vh auto', padding: 24 }}><div className="eyebrow">Admin security check</div><h1>Admin session validation is temporarily unavailable</h1><p className="sub">The admin session was not bypassed or cleared. Please retry when the database connection recovers.</p><a className="btn" href="/admin">Retry admin</a></main>;
+  }
 
   if (!admin) {
     // Only the login screen is reachable without a session.

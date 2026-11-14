@@ -116,7 +116,7 @@ export async function getAnalytics(params) {
   const interval = INTERVALS[bucket];
   const bucketedSeries = filteredCte(range, where);
 
-  const [summary, seriesRows, statusRows, paymentRows, productRows, categoryRows, campaignRows, customerRows, customerPurchaseTypes, trafficRows, events, eventConversion, recentTraffic, inventoryRows, recentOrders, couponRows, comparison, filterOptions, hourRows, weekdayRows] = await Promise.all([
+  const [summary, seriesRows, statusRows, paymentRows, productRows, categoryRows, campaignRows, customerRows, customerPurchaseTypes, trafficRows, events, eventConversion, recentTraffic, inventoryRows, recentOrders, couponRows, comparison, filterOptions, hourRows, weekdayRows, liveSessions, productActivity] = await Promise.all([
     sql`${filteredCte(range, where)}
       select count(*)::int orders,
         count(*) filter(where payment_status='paid' and status not in ('cancelled','refunded'))::int paid_orders,
@@ -142,6 +142,17 @@ export async function getAnalytics(params) {
           count(*) filter(where payment_status='paid' and status not in ('cancelled','refunded'))::int paid_orders,
           coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue,
           coalesce(sum(discount_total),0)::bigint discounts,
+          coalesce(avg(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint average_order_value,
+          count(*) filter(where status='pending')::int pending_orders,
+          count(*) filter(where status='confirmed')::int confirmed_orders,
+          count(*) filter(where status='processing')::int processing_orders,
+          count(*) filter(where status='packed')::int packed_orders,
+          count(*) filter(where status='shipped')::int shipped_orders,
+          count(*) filter(where status='out_for_delivery')::int out_for_delivery_orders,
+          count(*) filter(where status='delivered')::int delivered_orders,
+          count(*) filter(where status='cancelled')::int cancelled_orders,
+          count(*) filter(where status='returned')::int returned_orders,
+          count(*) filter(where payment_status<>'paid' and status not in ('cancelled','refunded'))::int unpaid_orders,
           coalesce(sum((select sum(oi.qty) from order_items oi left join products p on p.id=oi.product_id where oi.order_id=filtered.id
             and (${product}::text is null or oi.product_id::text=${product})
             and (${category}::text is null or p.category_id::text=${category}))) filter(where status not in ('cancelled','refunded')),0)::bigint units
@@ -158,14 +169,35 @@ export async function getAnalytics(params) {
           count(distinct f.customer_id) filter(where f.customer_id is not null and f.placed_at <= (select min(old.placed_at) from orders old where old.customer_id=f.customer_id and old.status not in ('cancelled','refunded')))::int new_purchasers,
           count(distinct f.customer_id) filter(where f.customer_id is not null and f.placed_at > (select min(old.placed_at) from orders old where old.customer_id=f.customer_id and old.status not in ('cancelled','refunded')))::int returning_purchasers
         from filtered f where f.status not in ('cancelled','refunded') group by 1
+      ), auth_activity as (
+        select date_trunc(${bucket}, created_at at time zone ${timezone}) local_bucket,
+          count(*) filter(where subject_type='customer')::int customer_sessions,
+          count(*) filter(where subject_type='admin')::int admin_sessions
+        from sessions where created_at >= ${range.start}::timestamptz and created_at < ${range.end}::timestamptz group by 1
+      ), stock_activity as (
+        select date_trunc(${bucket}, sa.created_at at time zone ${timezone}) local_bucket,coalesce(sum(sa.delta),0)::int stock_delta
+        from stock_adjustments sa left join products sp on sp.id=sa.product_id
+        where sa.created_at >= ${range.start}::timestamptz and sa.created_at < ${range.end}::timestamptz
+          and (${product}::text is null or sa.product_id::text=${product})
+          and (${category}::text is null or sp.category_id::text=${category}) group by 1
       )
       select to_char(b.local_bucket, 'YYYY-MM-DD"T"HH24:MI:SS') as date,
         coalesce(a.orders,0)::int orders, coalesce(a.paid_orders,0)::int paid_orders,
+        coalesce(a.unpaid_orders,0)::int unpaid_orders,
+        coalesce(a.pending_orders,0)::int pending_orders,coalesce(a.confirmed_orders,0)::int confirmed_orders,
+        coalesce(a.processing_orders,0)::int processing_orders,coalesce(a.packed_orders,0)::int packed_orders,
+        coalesce(a.shipped_orders,0)::int shipped_orders,coalesce(a.out_for_delivery_orders,0)::int out_for_delivery_orders,
+        coalesce(a.delivered_orders,0)::int delivered_orders,coalesce(a.cancelled_orders,0)::int cancelled_orders,coalesce(a.returned_orders,0)::int returned_orders,
+        coalesce(a.average_order_value,0)::bigint average_order_value,
         coalesce(a.revenue,0)::bigint revenue, coalesce(a.discounts,0)::bigint discounts,
         coalesce(a.units,0)::bigint units, coalesce(v.page_views,0)::int page_views,
         coalesce(v.visitor_days,0)::int visitor_days, coalesce(c.new_customers,0)::int new_customers,
-        coalesce(bt.new_purchasers,0)::int new_purchasers, coalesce(bt.returning_purchasers,0)::int returning_purchasers
-      from buckets b left join aggregated a using(local_bucket) left join visitors v using(local_bucket) left join signups c using(local_bucket) left join buyer_types bt using(local_bucket)
+        coalesce(bt.new_purchasers,0)::int new_purchasers, coalesce(bt.returning_purchasers,0)::int returning_purchasers,
+        coalesce(aa.customer_sessions,0)::int customer_sessions,coalesce(aa.admin_sessions,0)::int admin_sessions,
+        coalesce(sa.stock_delta,0)::int stock_delta
+      from buckets b left join aggregated a using(local_bucket) left join visitors v using(local_bucket)
+        left join signups c using(local_bucket) left join buyer_types bt using(local_bucket)
+        left join auth_activity aa using(local_bucket) left join stock_activity sa using(local_bucket)
       order by b.local_bucket`,
     sql`${filteredCte(range, where)} select status, count(*)::int orders, coalesce(sum(grand_total),0)::bigint value from filtered group by status order by status`,
     sql`${filteredCte(range, where)} select payment_method as name, count(*)::int orders,
@@ -240,6 +272,17 @@ export async function getAnalytics(params) {
     sql`${filteredCte(range, where)} select extract(isodow from placed_at at time zone ${timezone})::int weekday,
       count(*)::int orders, coalesce(sum(grand_total) filter(where payment_status='paid' and status not in ('cancelled','refunded')),0)::bigint revenue
       from filtered group by 1 order by 1`,
+    sql`select count(*) filter(where revoked_at is null and expires_at>now())::int valid_sessions,
+      count(distinct (subject_type,subject_id)) filter(where revoked_at is null and expires_at>now())::int valid_accounts,
+      count(distinct subject_id) filter(where subject_type='customer' and revoked_at is null and expires_at>now())::int valid_customer_accounts,
+      count(distinct subject_id) filter(where subject_type='admin' and revoked_at is null and expires_at>now())::int valid_admin_accounts
+      from sessions`,
+    sql`select e.product_id::text product_id,coalesce(p.name,'Deleted product') name,count(*)::int views
+      from analytics_events e left join products p on p.id=e.product_id
+      where e.event_type='product_view' and e.created_at >= ${range.start}::timestamptz and e.created_at < ${range.end}::timestamptz
+        and (${product}::text is null or e.product_id::text=${product})
+        and (${category}::text is null or p.category_id::text=${category})
+      group by e.product_id,p.name order by views desc limit 20`.then(rows=>({rows,available:true})).catch(()=>({rows:[],available:false})),
   ]);
   const eventMap = Object.fromEntries(events.rows.map((r) => [r.event_type, { count: toNumber(r.count), visitors: toNumber(r.visitor_days) }]));
   const funnel = ['page_view','product_view','add_to_cart','checkout_started','purchase'].map((name) => ({ name, ...eventMap[name] || { count: 0, visitors: 0 } }));
@@ -248,7 +291,16 @@ export async function getAnalytics(params) {
   const customerTypes = customerPurchaseTypes[0] || {};
   const inventory = inventoryRows[0] || {};
   const counts = summary[0] || {};
-  const series = seriesRows.map((r) => ({ ...r, revenue: toNumber(r.revenue), orders: toNumber(r.orders), units: toNumber(r.units), pageViews: toNumber(r.page_views), visitorDays: toNumber(r.visitor_days), customers: toNumber(r.new_customers), newPurchasers: toNumber(r.new_purchasers), returningPurchasers: toNumber(r.returning_purchasers) }));
+  const series = seriesRows.map((r) => ({ ...r,
+    revenue: toNumber(r.revenue), discounts: toNumber(r.discounts), averageOrderValue: toNumber(r.average_order_value),
+    orders: toNumber(r.orders), units: toNumber(r.units), pageViews: toNumber(r.page_views), visitorDays: toNumber(r.visitor_days),
+    customers: toNumber(r.new_customers), newPurchasers: toNumber(r.new_purchasers), returningPurchasers: toNumber(r.returning_purchasers),
+    customerSessions: toNumber(r.customer_sessions), adminSessions: toNumber(r.admin_sessions), stockDelta: toNumber(r.stock_delta),
+    paidOrders: toNumber(r.paid_orders), unpaidOrders: toNumber(r.unpaid_orders), pendingOrders: toNumber(r.pending_orders),
+    confirmedOrders: toNumber(r.confirmed_orders), processingOrders: toNumber(r.processing_orders), packedOrders: toNumber(r.packed_orders),
+    shippedOrders: toNumber(r.shipped_orders), outForDeliveryOrders: toNumber(r.out_for_delivery_orders), deliveredOrders: toNumber(r.delivered_orders),
+    cancelledOrders: toNumber(r.cancelled_orders), returnedOrders: toNumber(r.returned_orders),
+  }));
   const byHour = hourRows.map((r) => ({ ...r, hour: toNumber(r.hour), revenue: toNumber(r.revenue), orders: toNumber(r.orders), pageViews: toNumber(r.page_views), visitorDays: toNumber(r.visitor_days) }));
   const weekdayNames = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const byWeekday = weekdayNames.map((name,index) => {
@@ -263,8 +315,25 @@ export async function getAnalytics(params) {
   const paidOrders = toNumber(counts.paid_orders);
   const denominator = totalOrders - canceled - refunded;
   const ratio = (n, d) => d > 0 ? Number((n / d * 100).toFixed(1)) : null;
+  const productPerformanceMap = new Map(productRows.map((row) => [row.product_id, {
+    product_id: row.product_id, name: row.name, date: row.name,
+    units: toNumber(row.units), revenue: toNumber(row.revenue), views: 0,
+  }]));
+  for (const row of productActivity.rows) {
+    const current = productPerformanceMap.get(row.product_id) || { product_id: row.product_id, name: row.name, date: row.name, units: 0, revenue: 0, views: 0 };
+    current.views = toNumber(row.views);
+    productPerformanceMap.set(row.product_id, current);
+  }
+  const productPerformance = [...productPerformanceMap.values()].sort((a,b)=>b.views-a.views||b.units-a.units).slice(0,20);
   return {
     range: { ...range },
+    liveSessions: {
+      validSessions: toNumber(liveSessions[0]?.valid_sessions),
+      validAccounts: toNumber(liveSessions[0]?.valid_accounts),
+      validCustomerAccounts: toNumber(liveSessions[0]?.valid_customer_accounts),
+      validAdminAccounts: toNumber(liveSessions[0]?.valid_admin_accounts),
+      measuredAt: new Date().toISOString(),
+    },
     totals: {
       orders: totalOrders, revenue: toNumber(counts.revenue), grossPaid: toNumber(counts.revenue), outstanding,
       discounts: toNumber(counts.discounts), delivered: toNumber(counts.delivered), paidOrders,
@@ -285,6 +354,7 @@ export async function getAnalytics(params) {
     status: statusRows.map((x) => ({ name: x.status, orders: toNumber(x.orders), value: toNumber(x.value) })),
     payments: paymentRows.map((x) => ({ ...x, orders: toNumber(x.orders), revenue: toNumber(x.revenue), outstanding: toNumber(x.outstanding) })),
     products: productRows.map((x) => ({ ...x, units: toNumber(x.units), revenue: toNumber(x.revenue) })),
+    productPerformance, productViewTrackingAvailable: productActivity.available,
     categories: categoryRows.map((x) => ({ ...x, units: toNumber(x.units), orders: toNumber(x.orders), revenue: toNumber(x.revenue) })),
     campaigns: campaignRows.map((x) => ({ ...x, orders: toNumber(x.orders), revenue: toNumber(x.revenue), discounts: toNumber(x.discounts) })),
     customers: {
@@ -316,7 +386,10 @@ export async function getAnalytics(params) {
     notes: {
       currency: 'Revenue uses orders.grand_total in the configured base currency minor units (PKR by default); transaction display currency is not summed.',
       revenue: 'Revenue is paid gross order value excluding cancelled/refunded statuses. There is no refund ledger, so this is not net of refunds or returns.',
-      visitors: 'Visitor counts are distinct daily-rotating anonymous hashes (visitor-days), not deduplicated people or sessions.',
+      visitors: 'Visitor counts are distinct daily-rotating anonymous hashes (visitor-days), not deduplicated people or sessions. Historical visitor data only starts when instrumentation recorded it.',
+      liveSessions: 'The live count is distinct accounts with non-revoked, unexpired login sessions at query time. It is not a real-time activity/presence signal; the schema does not record last activity.',
+      loginHistory: 'Historical customer/admin login counts are sessions created in each time bucket, not unique active users.',
+      inventory: 'Historical inventory values cannot be reconstructed because the application stores stock adjustments but no opening-balance snapshots; stock delta uses recorded adjustments only.',
       conversion: 'Where event tracking exists, observed same-day visitor-day purchase share is calculated from daily-rotating hashes with both page_view and purchase events; it is a proxy, not a session-level or cross-day conversion rate.',
       delivery: 'Delivery duration is measured from order placed_at to delivered_at when both timestamps exist.',
       payments: 'The schema has no payment-attempt or settlement ledger/timestamp, so processor payment success rate and exact payment time are unavailable. Paid-order share is not a payment success rate.',

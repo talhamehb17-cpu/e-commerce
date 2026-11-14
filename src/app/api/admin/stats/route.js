@@ -8,11 +8,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
   const { error, status } = await guard('dashboard:read');
   if (error) return fail(error, status);
-
-  const store = await getSetting('store');
-  const period = resolveStatsPeriod(new URL(request.url).searchParams, store.timezone || 'Asia/Karachi');
-  if (period.error) return fail(period.error, 400);
   try {
+    const store = await getSetting('store');
+    const period = resolveStatsPeriod(new URL(request.url).searchParams, store.timezone || 'Asia/Karachi');
+    if (period.error) return fail(period.error, 400);
     return json(await getAdminStats(period));
   } catch (cause) {
     console.error('Admin dashboard statistics query failed:', cause?.message || 'unknown error');
