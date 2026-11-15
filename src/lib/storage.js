@@ -16,40 +16,84 @@ function client() {
 
 const endpoint = () => process.env.AWS_ENDPOINT_URL_S3.replace(/\/$/, '');
 const bucket = () => process.env.S3_BUCKET;
+const bucketUrl = () => `${endpoint()}/${bucket()}`;
+const objectUrl = (key) => `${bucketUrl()}/${key.split('/').map(encodeURIComponent).join('/')}`;
 
-/** Public URL for an object. Neon object storage exposes objects on the bucket path. */
+function makeStorageError(operation, response, body = '') {
+  const code = body.match(/<(?:\w+:)?Code>([^<]+)</i)?.[1] || null;
+  const error = new Error(`${operation} returned HTTP ${response.status}${code ? ` (${code})` : ''}`);
+  error.status = response.status;
+  error.storageCode = code;
+  return error;
+}
+
+async function throwResponseError(operation, response) {
+  const body = await response.text().catch(() => '');
+  throw makeStorageError(operation, response, body);
+}
+
+/**
+ * Public-facing URL for an object. The bucket stays private; the same-origin
+ * media route signs reads on the server, so public pages never need storage keys.
+ */
 export function publicUrl(key) {
-  return `${endpoint()}/${bucket()}/${key.split('/').map(encodeURIComponent).join('/')}`;
+  const path = `/api/media/${key.split('/').map(encodeURIComponent).join('/')}`;
+  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+  return configuredOrigin ? `${configuredOrigin.replace(/\/$/, '')}${path}` : path;
+}
+
+async function createBucketIfMissing() {
+  const response = await client().fetch(bucketUrl(), { method: 'PUT' });
+  if (response.ok) return;
+  const body = await response.text().catch(() => '');
+  const code = body.match(/<(?:\w+:)?Code>([^<]+)</i)?.[1] || null;
+  // Concurrent requests may both observe NoSuchBucket; the winner creates it.
+  if (response.status === 409 && code === 'BucketAlreadyOwnedByYou') return;
+  throw makeStorageError('Bucket creation', response, body);
 }
 
 export async function putObject({ buffer, contentType, folder = 'catalog', ext = 'jpg' }) {
   const key = `${folder}/${new Date().toISOString().slice(0, 10)}/${crypto.randomBytes(8).toString('hex')}.${ext}`;
-  const res = await client().fetch(publicUrl(key), {
+  const upload = () => client().fetch(objectUrl(key), {
     method: 'PUT',
     body: buffer,
     headers: { 'content-type': contentType, 'cache-control': 'public, max-age=31536000, immutable' },
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    const code = text.match(/<(?:\w+:)?Code>([^<]+)</i)?.[1] || null;
-    const error = new Error(`Storage returned HTTP ${res.status}${code ? ` (${code})` : ''}`);
-    error.status = res.status;
-    error.storageCode = code;
-    throw error;
+
+  let res = await upload();
+  if (res.status === 404) {
+    const body = await res.text().catch(() => '');
+    const code = body.match(/<(?:\w+:)?Code>([^<]+)</i)?.[1] || null;
+    if (code !== 'NoSuchBucket') throw makeStorageError('Image upload', new Response(null, { status: res.status }), body);
+    await createBucketIfMissing();
+    res = await upload();
   }
+  if (!res.ok) await throwResponseError('Image upload', res);
   return publicUrl(key);
 }
 
+export async function getObject(key) {
+  return client().fetch(objectUrl(key), { method: 'GET' });
+}
+
 export async function deleteObject(url) {
-  const prefix = `${endpoint()}/${bucket()}/`;
-  if (!url?.startsWith(prefix)) return { skipped: true };
-  const key = url.slice(prefix.length);
-  await client().fetch(`${endpoint()}/${bucket()}/${key}`, { method: 'DELETE' });
+  let key;
+  const storagePrefix = `${bucketUrl()}/`;
+  if (url?.startsWith(storagePrefix)) {
+    key = url.slice(storagePrefix.length);
+  } else if (typeof url === 'string') {
+    const publicPath = `/api/media/`;
+    const path = new URL(url, process.env.NEXT_PUBLIC_SITE_URL || 'https://store.invalid').pathname;
+    if (path.startsWith(publicPath)) key = path.slice(publicPath.length).split('/').map(decodeURIComponent).join('/');
+  }
+  if (!key) return { skipped: true };
+  const res = await client().fetch(objectUrl(key), { method: 'DELETE' });
+  if (!res.ok) await throwResponseError('Image delete', res);
   return { deleted: true };
 }
 
 export async function listObjects(prefix = '') {
-  const res = await client().fetch(`${endpoint()}/${bucket()}?list-type=2&prefix=${encodeURIComponent(prefix)}&max-keys=100`);
-  if (!res.ok) throw new Error(`storage list failed ${res.status}`);
+  const res = await client().fetch(`${bucketUrl()}?list-type=2&prefix=${encodeURIComponent(prefix)}&max-keys=100`);
+  if (!res.ok) await throwResponseError('Storage list', res);
   return res.text();
 }
