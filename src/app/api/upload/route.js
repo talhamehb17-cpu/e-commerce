@@ -47,8 +47,26 @@ export async function POST(request) {
     const url = await putObject({ buffer, contentType: file.type, folder, ext });
     return NextResponse.json({ ok: true, url });
   } catch (cause) {
+    const storageCode = String(cause?.storageCode || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || null;
+    const networkCode = String(cause?.cause?.code || cause?.cause?.name || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || null;
     const message = String(cause?.message || 'unknown upload error').replace(/https?:\/\/\S+/g, '[storage-url]').slice(0, 180);
-    console.error('Image object upload failed:', { name: cause?.name || 'Error', message });
-    return NextResponse.json({ error: 'Upload failed. Check storage configuration and try again.' }, { status: 502 });
+    console.error('Image object upload failed:', {
+      name: cause?.name || 'Error',
+      status: Number.isInteger(cause?.status) ? cause.status : null,
+      storageCode,
+      networkCode,
+      message,
+    });
+    const diagnostic = admin
+      ? Number.isInteger(cause?.status)
+        ? `Storage rejected the upload (HTTP ${cause.status}${storageCode ? `, ${storageCode}` : ''}).`
+        : networkCode
+          ? `Could not reach image storage (${networkCode}).`
+          : 'Image storage failed unexpectedly; check the deployment runtime logs.'
+      : undefined;
+    return NextResponse.json({
+      error: 'Upload failed. Check storage configuration and try again.',
+      ...(diagnostic ? { diagnostic } : {}),
+    }, { status: 502 });
   }
 }

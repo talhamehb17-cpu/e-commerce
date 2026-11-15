@@ -31,7 +31,11 @@ export async function putObject({ buffer, contentType, folder = 'catalog', ext =
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`storage responded ${res.status} ${text.slice(0, 160)}`);
+    const code = text.match(/<(?:\w+:)?Code>([^<]+)</i)?.[1] || null;
+    const error = new Error(`Storage returned HTTP ${res.status}${code ? ` (${code})` : ''}`);
+    error.status = res.status;
+    error.storageCode = code;
+    throw error;
   }
   return publicUrl(key);
 }
