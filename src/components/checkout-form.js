@@ -12,6 +12,8 @@ export function CheckoutForm({ items, totals, customer, addresses, payments, cur
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [proofFile, setProofFile] = useState(null);
+  const [transactionReference, setTransactionReference] = useState('');
   const def = addresses.find((a) => a.is_default_shipping) || addresses[0];
   const [form, setForm] = useState({
     email: customer?.email || '',
@@ -47,9 +49,18 @@ export function CheckoutForm({ items, totals, customer, addresses, payments, cur
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setError('');
+    let paymentProofKey = '';
+    if (form.paymentMethod !== 'cod') {
+      if (!proofFile || !transactionReference.trim()) { setError('Upload your payment proof and enter the transaction reference.'); setBusy(false); return; }
+      const upload = new FormData(); upload.set('file', proofFile);
+      const proofRes = await fetch('/api/payment-proof', { method: 'POST', body: upload });
+      const proofData = await proofRes.json().catch(() => ({}));
+      if (!proofRes.ok) { setError(proofData.error || 'Could not upload payment proof'); setBusy(false); return; }
+      paymentProofKey = proofData.proofKey;
+    }
     const res = await fetch('/api/checkout', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, currency, couponCode: localTotals?.coupon?.code || coupon || '' }),
+      body: JSON.stringify({ ...form, paymentProofKey, transactionReference, currency, couponCode: localTotals?.coupon?.code || coupon || '' }),
     });
     const data = await res.json();
     if (!res.ok) { setError(data.error || 'Could not place order'); setBusy(false); return; }
@@ -162,27 +173,40 @@ export function CheckoutForm({ items, totals, customer, addresses, payments, cur
               <Wallet size={16} style={{ opacity: 0.5 }} />
             </label>
           )}
-          {payments.bank_transfer && (
+          {payments.bank_transfer && payments.bank_details && (
             <label className="pay-opt">
               <input type="radio" name="pay" checked={form.paymentMethod === 'bank_transfer'} onChange={() => set('paymentMethod', 'bank_transfer')} />
-              <div style={{ flex: 1 }}><strong>Bank transfer</strong><small>Instructions emailed after you order</small></div>
+              <div style={{ flex: 1 }}><strong>Bank transfer</strong><small>Transfer using the account instructions shown below</small></div>
               <CreditCard size={16} style={{ opacity: 0.5 }} />
             </label>
           )}
-          {payments.easypaisa && (
+          {(payments.easypaisa_enabled ?? Boolean(payments.easypaisa)) && (
             <label className="pay-opt">
               <input type="radio" name="pay" checked={form.paymentMethod === 'easypaisa'} onChange={() => set('paymentMethod', 'easypaisa')} />
-              <div style={{ flex: 1 }}><strong>Easypaisa</strong><small>Send to {payments.easypaisa}</small></div>
+              <div style={{ flex: 1 }}><strong>Easypaisa</strong><small>{payments.easypaisa || 'See payment instructions'}</small></div>
             </label>
           )}
-          {payments.jazzcash && (
+          {(payments.jazzcash_enabled ?? Boolean(payments.jazzcash)) && (
             <label className="pay-opt">
               <input type="radio" name="pay" checked={form.paymentMethod === 'jazzcash'} onChange={() => set('paymentMethod', 'jazzcash')} />
-              <div style={{ flex: 1 }}><strong>JazzCash</strong><small>Send to {payments.jazzcash}</small></div>
+              <div style={{ flex: 1 }}><strong>JazzCash</strong><small>{payments.jazzcash || 'See payment instructions'}</small></div>
             </label>
           )}
-          {form.paymentMethod === 'bank_transfer' && (
-            <div className="notice" style={{ whiteSpace: 'pre-line', marginTop: 8, fontSize: 12 }}>{payments.bank_details}</div>
+          {form.paymentMethod !== 'cod' && (
+            <>
+              <div className="notice" style={{ whiteSpace: 'pre-line', marginTop: 8, fontSize: 12 }}>
+                {form.paymentMethod === 'bank_transfer' ? payments.bank_details : (payments[`${form.paymentMethod}_instructions`] || `${form.paymentMethod === 'easypaisa' ? 'Easypaisa' : 'JazzCash'} account: ${payments[form.paymentMethod] || 'Contact the store for current account details.'}`)}
+              </div>
+              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Your order remains pending until an administrator verifies the transfer. Upload a clear receipt; proof submission is not payment confirmation.</p>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label htmlFor="transaction-reference">Transaction reference <span aria-hidden="true">*</span></label>
+                <input id="transaction-reference" className="input" required maxLength={120} value={transactionReference} onChange={e => setTransactionReference(e.target.value)} placeholder="Reference / transaction ID" />
+              </div>
+              <div className="field">
+                <label htmlFor="payment-proof">Payment proof (JPG, PNG, WebP or PDF; max 4 MB) <span aria-hidden="true">*</span></label>
+                <input id="payment-proof" className="input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required onChange={e => setProofFile(e.target.files?.[0] || null)} />
+              </div>
+            </>
           )}
           <div className="field" style={{ marginTop: 14 }}>
             <label htmlFor="cnotes">Order notes (optional)</label>

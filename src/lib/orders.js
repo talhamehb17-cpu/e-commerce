@@ -37,6 +37,8 @@ export async function changeOrderStatus({ orderId, status, note = '', actor = 'a
     const order=rows[0];
     if(!order)return {error:'Order not found'};
     const previous=order.status;
+    if(order.payment_method!=='cod'&&order.payment_status!=='paid'&&status!==previous&&status!=='cancelled')
+      return {error:'Online payment must be verified before confirming or fulfilling this order.'};
     if(previous===status&&!trackingNumber&&!carrier)return {changed:false,order};
     const delivered=status==='delivered'?new Date():null;
     const cancelled=status==='cancelled'?new Date():null;

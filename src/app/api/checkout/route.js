@@ -25,6 +25,15 @@ export async function POST(request) {
 
   const payments = await getSetting('payments');
   if (data.paymentMethod === 'cod' && !payments.cod) return fail('Cash on delivery is currently unavailable.', 400);
+  if (data.paymentMethod !== 'cod') {
+    const enabled = data.paymentMethod === 'bank_transfer' ? Boolean(payments.bank_transfer) : Boolean(payments[`${data.paymentMethod}_enabled`] ?? payments[data.paymentMethod]);
+    if (!enabled) return fail('This payment method is currently unavailable.', 400);
+    const hasInstructions = data.paymentMethod === 'bank_transfer' ? Boolean(payments.bank_details?.trim()) : Boolean(payments[data.paymentMethod]?.trim() || payments[`${data.paymentMethod}_instructions`]?.trim());
+    if (!hasInstructions) return fail('Payment instructions are not configured yet. Choose another method or contact the store.', 400);
+    if (!customer) return fail('Sign in to pay by bank transfer or mobile wallet.', 401);
+    if (!data.paymentProofKey || !data.transactionReference?.trim()) return fail('Upload your payment proof and enter its transaction reference.', 422);
+    if (!data.paymentProofKey.startsWith(`payment-proofs/customer-${customer.id}/`)) return fail('The uploaded proof is not associated with your account.', 403);
+  }
 
   for (const it of items) {
     if (it.qty > it.stock) return fail(`${it.name} only has ${it.stock} left in stock.`, 409);
@@ -55,11 +64,11 @@ export async function POST(request) {
     for (let attempt = 0; attempt < 3 && !orderRow; attempt++) {
       try {
         const rows = await tx`
-          insert into orders (order_number, customer_id, email, phone, status, payment_method, currency, fx_rate,
+          insert into orders (order_number, customer_id, email, phone, status, payment_status, payment_method, currency, fx_rate,
             subtotal, discount_total, shipping_total, tax_total, grand_total, display_total, coupon_code,
             promotion_event_id, promotion_discount_total, coupon_discount_total, shipping_address, billing_address, notes)
           values (${generateOrderNumber()}, ${customer?.id || null}, ${data.email}, ${data.phone}, 'pending',
-            ${data.paymentMethod}, ${cur.code}, ${rate}, ${recalculated.subtotal}, ${recalculated.discount},
+            ${data.paymentMethod === 'cod' ? 'unpaid' : 'pending'}, ${data.paymentMethod}, ${cur.code}, ${rate}, ${recalculated.subtotal}, ${recalculated.discount},
             ${recalculated.shipping}, ${recalculated.tax}, ${recalculated.total}, ${displayTotal},
             ${recalculated.coupon?.code || null}, ${appliedEventIds[0]||null}, ${recalculated.eventDiscount}, ${recalculated.couponDiscount},
             ${tx.json({ full_name: data.fullName, phone: data.phone, line1: data.line1, line2: data.line2 || '', city: data.city, state: data.state || '', postal_code: data.postalCode || '', country: data.country })},
@@ -91,6 +100,10 @@ export async function POST(request) {
     }
 
     await tx`insert into order_events (order_id, status, note, actor) values (${orderRow.id}, 'pending', 'Order placed', 'customer')`;
+    if (data.paymentMethod !== 'cod') {
+      await tx`insert into payment_submissions(order_id,customer_id,proof_key,transaction_reference,status)
+        values(${orderRow.id},${customer.id},${data.paymentProofKey},${data.transactionReference.trim()},'pending')`;
+    }
 
     for(const [eventId,discountTotal] of eventDiscounts){
       await tx`insert into order_promotion_events(order_id,event_id,discount_total) values(${orderRow.id},${eventId},${discountTotal})`;

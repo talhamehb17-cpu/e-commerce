@@ -163,8 +163,8 @@ export const templates = {
     subject: `Order ${order.order_number} received`,
     html: layout({
       title: 'We have your order',
-      preheader: `Order ${order.order_number} is confirmed`,
-      body: `<p>Thank you, ${name}. We're preparing order <strong>${order.order_number}</strong>.</p>
+      preheader: `Order ${order.order_number} has been received`,
+      body: `<p>Thank you, ${name}. We have received order <strong>${order.order_number}</strong>.${order.payment_method !== 'cod' ? ' Your order will be confirmed after an administrator verifies your payment proof.' : ''}</p>
         ${itemsTable(items)}
         <table role="presentation" width="100%" style="font-size:13.5px">
           <tr><td style="padding:4px 0;color:#8a8073">Subtotal</td><td align="right">${money(order.subtotal)}</td></tr>

@@ -119,9 +119,15 @@ export function AdminSettings() {
           <label className="switch" style={{ marginBottom: 12 }}><input type="checkbox" checked={Boolean(s.payments.cod)} onChange={(e) => set('payments', 'cod', e.target.checked)} /> Cash on delivery</label>
           <label className="switch" style={{ marginBottom: 12 }}><input type="checkbox" checked={Boolean(s.payments.bank_transfer)} onChange={(e) => set('payments', 'bank_transfer', e.target.checked)} /> Bank transfer</label>
           <div className="field"><label>Bank details shown at checkout</label><textarea className="input" rows={4} value={s.payments.bank_details || ''} onChange={(e) => set('payments', 'bank_details', e.target.value)} /></div>
+          <label className="switch" style={{ marginBottom: 12 }}><input type="checkbox" checked={Boolean(s.payments.easypaisa_enabled ?? s.payments.easypaisa)} onChange={(e) => set('payments', 'easypaisa_enabled', e.target.checked)} /> Enable Easypaisa</label>
           <div className="form-row">
-            <div className="field"><label>EasyPaisa number</label><input className="input" value={s.payments.easypaisa || ''} onChange={(e) => set('payments', 'easypaisa', e.target.value)} /></div>
-            <div className="field"><label>JazzCash number</label><input className="input" value={s.payments.jazzcash || ''} onChange={(e) => set('payments', 'jazzcash', e.target.value)} /></div>
+            <div className="field"><label>Easypaisa account / number</label><input className="input" value={s.payments.easypaisa || ''} onChange={(e) => set('payments', 'easypaisa', e.target.value)} /></div>
+            <div className="field"><label>Easypaisa instructions</label><textarea className="input" rows={2} value={s.payments.easypaisa_instructions || ''} onChange={(e) => set('payments', 'easypaisa_instructions', e.target.value)} placeholder="Account title and transfer instructions" /></div>
+          </div>
+          <label className="switch" style={{ marginBottom: 12 }}><input type="checkbox" checked={Boolean(s.payments.jazzcash_enabled ?? s.payments.jazzcash)} onChange={(e) => set('payments', 'jazzcash_enabled', e.target.checked)} /> Enable JazzCash</label>
+          <div className="form-row">
+            <div className="field"><label>JazzCash account / number</label><input className="input" value={s.payments.jazzcash || ''} onChange={(e) => set('payments', 'jazzcash', e.target.value)} /></div>
+            <div className="field"><label>JazzCash instructions</label><textarea className="input" rows={2} value={s.payments.jazzcash_instructions || ''} onChange={(e) => set('payments', 'jazzcash_instructions', e.target.value)} placeholder="Account title and transfer instructions" /></div>
           </div>
           <button className="btn" onClick={() => save('payments')}><Save size={13} /> Save payments</button>
         </div>

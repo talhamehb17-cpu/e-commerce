@@ -7,7 +7,7 @@ export const metadata = { title: 'Order confirmed' };
 
 export default async function SuccessPage({ searchParams }) {
   const { order } = await searchParams;
-  const rows = order ? await sql`select order_number, status, grand_total, currency, display_total, email, placed_at from orders where order_number = ${order}` : [];
+  const rows = order ? await sql`select order_number, status, payment_status, payment_method, grand_total, currency, display_total, email, placed_at from orders where order_number = ${order}` : [];
   const o = rows[0];
 
   return (
@@ -17,12 +17,13 @@ export default async function SuccessPage({ searchParams }) {
       {o ? (
         <>
           <p className="muted" style={{ marginTop: 12, fontSize: 14.5 }}>
-            Your order <strong style={{ color: 'var(--ink)' }}>{o.order_number}</strong> is confirmed. A receipt is on its way to {o.email}.
+            Your order <strong style={{ color: 'var(--ink)' }}>{o.order_number}</strong> has been received. {o.payment_method === 'cod' ? `Payment is due on delivery. A receipt is on its way to ${o.email}.` : 'It will remain pending until an administrator verifies your payment proof.'}
           </p>
           <div className="card" style={{ marginTop: 26, textAlign: 'left' }}>
             <div className="summary-row"><span>Order</span><span>{o.order_number}</span></div>
             <div className="summary-row"><span>Placed</span><span>{new Date(o.placed_at).toLocaleString('en-GB')}</span></div>
-            <div className="summary-row"><span>Payment</span><span style={{ textTransform: 'capitalize' }}>{o.status}</span></div>
+            <div className="summary-row"><span>Order status</span><span style={{ textTransform: 'capitalize' }}>{o.status}</span></div>
+            <div className="summary-row"><span>Payment status</span><span style={{ textTransform: 'capitalize' }}>{o.payment_status}</span></div>
             <div className="summary-row total"><span>Total</span><span>Rs {(Number(o.grand_total) / 100).toLocaleString('en-US')}</span></div>
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 26, flexWrap: 'wrap' }}>

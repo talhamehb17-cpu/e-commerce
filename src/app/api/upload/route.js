@@ -5,7 +5,8 @@ import { rateLimit } from '@/lib/db';
 
 export const runtime = 'nodejs';
 
-const MAX_BYTES = 6 * 1024 * 1024;
+// Keep files below Vercel's serverless request-body ceiling after multipart overhead.
+const MAX_BYTES = 4 * 1024 * 1024;
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 function validImageSignature(type, b) {
   if (type === 'image/jpeg') return b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
@@ -20,7 +21,7 @@ export async function POST(request) {
   if (!customer && !admin) return NextResponse.json({ error: 'Sign in to upload images.' }, { status: 401 });
   if (admin && !can(admin, 'products:write') && !can(admin, 'content:write')) return NextResponse.json({ error: 'Not permitted to upload catalog images.' }, { status: 403 });
   const announcedLength = Number(request.headers.get('content-length') || 0);
-  if (announcedLength > MAX_BYTES + 64 * 1024) return NextResponse.json({ error: 'Max file size is 6MB.' }, { status: 413 });
+  if (announcedLength > MAX_BYTES + 64 * 1024) return NextResponse.json({ error: 'Max file size is 4MB.' }, { status: 413 });
   const key = admin ? `admin:${admin.id}` : `customer:${customer.id}`;
   if (!rateLimit(`upload:${key}`, 30, 60_000).ok) {
     return NextResponse.json({ error: 'Too many uploads, slow down.' }, { status: 429 });
@@ -31,7 +32,7 @@ export async function POST(request) {
   if (!file || typeof file === 'string') return NextResponse.json({ error: 'No file received.' }, { status: 400 });
   if (!ALLOWED.includes(file.type)) return NextResponse.json({ error: 'Use JPG, PNG, WebP or AVIF.' }, { status: 415 });
   if (!file.size) return NextResponse.json({ error: 'Choose a non-empty image file.' }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: 'Max file size is 6MB.' }, { status: 413 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: 'Max file size is 4MB.' }, { status: 413 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
   if (!validImageSignature(file.type, buffer)) return NextResponse.json({ error: 'The file contents do not match the selected image type.' }, { status: 415 });

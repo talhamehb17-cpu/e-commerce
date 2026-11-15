@@ -52,24 +52,30 @@ async function createBucketIfMissing() {
   throw makeStorageError('Bucket creation', response, body);
 }
 
-export async function putObject({ buffer, contentType, folder = 'catalog', ext = 'jpg' }) {
-  const key = `${folder}/${new Date().toISOString().slice(0, 10)}/${crypto.randomBytes(8).toString('hex')}.${ext}`;
+async function putBytes({ buffer, contentType, folder, ext, isPrivate }) {
+  const key = `${folder}/${new Date().toISOString().slice(0, 10)}/${crypto.randomBytes(isPrivate ? 16 : 8).toString('hex')}.${ext}`;
   const upload = () => client().fetch(objectUrl(key), {
-    method: 'PUT',
-    body: buffer,
-    headers: { 'content-type': contentType, 'cache-control': 'public, max-age=31536000, immutable' },
+    method: 'PUT', body: buffer,
+    headers: { 'content-type': contentType, 'cache-control': isPrivate ? 'private, no-store' : 'public, max-age=31536000, immutable' },
   });
-
   let res = await upload();
   if (res.status === 404) {
     const body = await res.text().catch(() => '');
     const code = body.match(/<(?:\w+:)?Code>([^<]+)</i)?.[1] || null;
-    if (code !== 'NoSuchBucket') throw makeStorageError('Image upload', new Response(null, { status: res.status }), body);
+    if (code !== 'NoSuchBucket') throw makeStorageError(isPrivate ? 'Private file upload' : 'Image upload', new Response(null, { status: res.status }), body);
     await createBucketIfMissing();
     res = await upload();
   }
-  if (!res.ok) await throwResponseError('Image upload', res);
-  return publicUrl(key);
+  if (!res.ok) await throwResponseError(isPrivate ? 'Private file upload' : 'Image upload', res);
+  return key;
+}
+
+export async function putObject({ buffer, contentType, folder = 'catalog', ext = 'jpg' }) {
+  return publicUrl(await putBytes({ buffer, contentType, folder, ext, isPrivate: false }));
+}
+
+export async function putPrivateObject({ buffer, contentType, folder, ext }) {
+  return putBytes({ buffer, contentType, folder, ext, isPrivate: true });
 }
 
 export async function getObject(key) {

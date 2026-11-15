@@ -15,6 +15,7 @@ const NAV = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/orders', label: 'Orders', icon: Package, badgeKey: 'orders' },
+    { href: '/admin/payment-verification', label: 'Payment verification', icon: ShieldCheck, badgeKey: 'payments' },
     { href: '/admin/customers', label: 'Customers', icon: Users },
   ]},
   { group: 'Catalogue', items: [
@@ -47,7 +48,7 @@ export function AdminShell({ admin, adminAccess = {}, badges = {}, children }) {
   const accessFor = (href) => {
     if (href === '/admin') return true;
     if (href.startsWith('/admin/analytics')) return adminAccess.analytics;
-    if (href.startsWith('/admin/orders')) return adminAccess.orders;
+    if (href.startsWith('/admin/orders') || href.startsWith('/admin/payment-verification')) return adminAccess.orders;
     if (href.startsWith('/admin/customers')) return adminAccess.customers;
     if (href.startsWith('/admin/products') || href.startsWith('/admin/inventory') || href.startsWith('/admin/categories') || href.startsWith('/admin/brands') || href.startsWith('/admin/collections')) return adminAccess.products;
     if (href.startsWith('/admin/reviews')) return adminAccess.reviews;

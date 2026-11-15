@@ -7,6 +7,7 @@ import { getCurrentAdmin } from '@/lib/auth';
 import { fulfillOrder, timelineFor } from '@/lib/orders';
 import { StatusPill } from '@/components/ui';
 import { Truck, MapPin, CreditCard } from '@/components/icons';
+import { PaymentProofResubmit } from '@/components/payment-proof-resubmit';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ export default async function OrderDetail({ params }) {
   if (!admin && (!customer || order.customer_id !== customer.id)) notFound();
 
   const events = await sql`select status, note, created_at, email_sent from order_events where order_id = ${order.id} order by created_at`;
+  const paymentSubmission = !admin && order.payment_method !== 'cod' ? (await sql`select id,status,rejection_reason,created_at from payment_submissions where order_id=${order.id} order by created_at desc limit 1`)[0] : null;
   const timeline = timelineFor(order, events);
   const addr = order.shipping_address || {};
   const money = (n) => `Rs ${(Number(n) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -31,6 +33,8 @@ export default async function OrderDetail({ params }) {
         </div>
         <StatusPill status={order.status} />
       </div>
+
+      {!admin && order.payment_method !== 'cod' && <PaymentProofResubmit orderNumber={order.order_number} submission={paymentSubmission || null} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 14, marginBottom: 14 }}>
         <div className="card">

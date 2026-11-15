@@ -564,3 +564,24 @@ create index if not exists idx_analytics_events_created_type on analytics_events
 create index if not exists idx_analytics_events_visitor on analytics_events(visitor_hash, created_at desc);
 create index if not exists idx_orders_payment_placed on orders(payment_status, placed_at desc);
 create index if not exists idx_orders_campaign_placed on orders(coupon_code, placed_at desc);
+
+-- Manual payment proof submissions are private, append-only history.
+create table if not exists payment_submissions (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references orders(id) on delete cascade,
+  customer_id uuid references customers(id) on delete set null,
+  proof_key text not null,
+  transaction_reference text not null,
+  status text not null default 'pending' check (status in ('pending','verified','rejected')),
+  rejection_reason text,
+  reviewed_by uuid references admins(id) on delete set null,
+  reviewed_by_email text,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_payment_submissions_status_created on payment_submissions(status,created_at desc);
+create index if not exists idx_payment_submissions_order_created on payment_submissions(order_id,created_at desc);
+
+-- Remove only the repository's former sample bank account; preserve any operator-configured details.
+update settings set value=jsonb_set(value,'{bank_details}','""'::jsonb),updated_at=now()
+where key='payments' and value->>'bank_details' like 'Bank: Meezan Bank%Account: 0123 4567 8901 2345%';

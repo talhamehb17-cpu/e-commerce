@@ -30,17 +30,18 @@ export default async function AdminLayout({ children }) {
     return <LoginGate />;
   }
 
-  const [pending, lowStock, pendingReviews] = await Promise.all([
+  const [pending, lowStock, pendingReviews, paymentQueue] = await Promise.all([
     sql`select count(*)::int n from orders where status in ('pending','confirmed')`.catch(() => [{ n: 0 }]),
     sql`select count(*)::int n from products where stock <= low_stock_threshold and is_active`.catch(() => [{ n: 0 }]),
     sql`select count(*)::int n from reviews where not is_approved`.catch(() => [{ n: 0 }]),
+    sql`select count(*)::int n from (select distinct on(order_id) status from payment_submissions order by order_id,created_at desc) x where status='pending'`.catch(() => [{ n: 0 }]),
   ]);
 
   return (
     <AdminShell
       admin={{ id: admin.id, name: admin.name, email: admin.email, role: admin.role, avatar: admin.avatar_url }}
       adminAccess={{ products: can(admin, 'products:read'), orders: can(admin, 'orders:read'), customers: can(admin, 'customers:read'), reviews: can(admin, 'reviews:read'), content: can(admin, 'content:read'), settings: can(admin, 'settings:read'), analytics: can(admin, 'dashboard:read'), ownerEmail: admin.role === 'owner' }}
-      badges={{ orders: pending[0].n, inventory: lowStock[0].n, reviews: pendingReviews[0].n }}
+      badges={{ orders: pending[0].n, inventory: lowStock[0].n, reviews: pendingReviews[0].n, payments: paymentQueue[0].n }}
     >
       {children}
     </AdminShell>

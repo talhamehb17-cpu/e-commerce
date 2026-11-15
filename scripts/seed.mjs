@@ -340,10 +340,7 @@ async function main() {
     free_threshold: 1500000, flat_rate: 25000, express_rate: 60000, tax_percent: 0,
     delivery_days: '2–4 business days', return_window_days: 30,
   })} where key = 'shipping'`;
-  await sql`update settings set value = value || ${sql.json({
-    from_name: 'NOVA',
-    bank_details: 'Bank: Meezan Bank\nTitle: NOVA Commerce (Pvt) Ltd\nAccount: 0123 4567 8901 2345\nIBAN: PK00 MEZN 0000 0000 0000 0000',
-  })} where key = 'payments'`;
+  await sql`update settings set value = value || ${sql.json({ from_name: 'NOVA' })} where key = 'payments'`;
 
   // admin
   const { hashPassword } = await import('../src/lib/db.js');

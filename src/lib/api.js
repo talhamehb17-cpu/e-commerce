@@ -80,6 +80,8 @@ export const schemas = {
     postalCode: z.string().trim().max(20).optional().or(z.literal('')),
     country: z.string().trim().min(2).max(80),
     paymentMethod: z.enum(['cod', 'bank_transfer', 'easypaisa', 'jazzcash']),
+    paymentProofKey: z.string().max(500).optional().or(z.literal('')),
+    transactionReference: z.string().trim().max(120).optional().or(z.literal('')),
     currency: z.string().trim().length(3),
     shippingMethod: z.enum(['standard', 'express']).default('standard'),
     couponCode: z.string().trim().max(40).optional().or(z.literal('')),
