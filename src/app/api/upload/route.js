@@ -46,7 +46,9 @@ export async function POST(request) {
   try {
     const url = await putObject({ buffer, contentType: file.type, folder, ext });
     return NextResponse.json({ ok: true, url });
-  } catch {
+  } catch (cause) {
+    const message = String(cause?.message || 'unknown upload error').replace(/https?:\/\/\S+/g, '[storage-url]').slice(0, 180);
+    console.error('Image object upload failed:', { name: cause?.name || 'Error', message });
     return NextResponse.json({ error: 'Upload failed. Check storage configuration and try again.' }, { status: 502 });
   }
 }
